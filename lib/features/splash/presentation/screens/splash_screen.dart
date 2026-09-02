@@ -105,13 +105,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      'CookMate',
-                      style: TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                        color: AppColors.white,
+                    RichText(
+                      text: const TextSpan(
+                        style: TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
+                        ),
+                        children: [
+                          TextSpan(text: 'Cook', style: TextStyle(color: Colors.white)),
+                          TextSpan(text: 'Mate', style: TextStyle(color: AppColors.nonVegRed)),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 6),

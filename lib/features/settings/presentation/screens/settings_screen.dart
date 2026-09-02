@@ -330,9 +330,18 @@ class SettingsScreen extends ConsumerWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          l10n.appName,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                            ),
+                            children: [
+                              TextSpan(text: 'Cook', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                              const TextSpan(text: 'Mate', style: TextStyle(color: AppColors.nonVegRed)),
+                            ],
+                          ),
                         ),
                         const Text(
                           'Version 2.0.0 • Indian Culinary Edition',

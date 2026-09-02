@@ -115,12 +115,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  l10n.appName,
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.3,
+                                RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.3,
+                                      color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                                    ),
+                                    children: [
+                                      TextSpan(text: 'Cook', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                                      const TextSpan(text: 'Mate', style: TextStyle(color: AppColors.nonVegRed)),
+                                    ],
                                   ),
                                 ),
                                 Text(
