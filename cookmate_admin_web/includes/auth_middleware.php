@@ -16,6 +16,9 @@ function set_cors_headers(): void {
 }
 
 function json_response(array $data, int $statusCode = 200): void {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     if (!headers_sent()) {
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
@@ -48,13 +51,29 @@ function get_auth_token_from_headers(): ?string {
         return $matches[1];
     }
 
+    // Direct token header without Bearer prefix
+    if (isset($_SERVER['HTTP_X_COOKMATE_TOKEN']) && !empty(trim($_SERVER['HTTP_X_COOKMATE_TOKEN']))) {
+        return trim($_SERVER['HTTP_X_COOKMATE_TOKEN']);
+    }
+
+    // Fallback to POST/GET parameter if header was stripped by web server or proxy
+    if (!empty($_POST['auth_token'])) {
+        return trim($_POST['auth_token']);
+    }
+    if (!empty($_GET['auth_token'])) {
+        return trim($_GET['auth_token']);
+    }
+
     return null;
 }
 
-function get_authenticated_user(PDO $pdo, bool $required = true): ?array {
+function get_authenticated_user(PDO $pdo, bool $required = true, bool $autoRegister = false, ?string $displayName = null): ?array {
     $token = get_auth_token_from_headers();
 
     if (!$token) {
+        if ($autoRegister) {
+            return get_or_register_user($pdo, null, $displayName);
+        }
         if ($required) {
             json_response([
                 'success' => false,
@@ -69,6 +88,9 @@ function get_authenticated_user(PDO $pdo, bool $required = true): ?array {
     $user = $stmt->fetch();
 
     if (!$user) {
+        if ($autoRegister) {
+            return get_or_register_user($pdo, $token, $displayName);
+        }
         if ($required) {
             json_response([
                 'success' => false,
@@ -96,8 +118,14 @@ function get_or_register_user(PDO $pdo, ?string $token, ?string $displayName = n
         }
     }
 
-    // Generate fresh secure token
-    $newToken = bin2hex(random_bytes(24));
+    // If client supplied a valid formatted token string, retain it so client stays in sync!
+    $cleanToken = null;
+    if ($token && preg_match('/^[a-zA-Z0-9_\-\.]{8,64}$/', $token)) {
+        $cleanToken = $token;
+    }
+
+    // Generate fresh secure token if no valid token provided
+    $newToken = $cleanToken ?: bin2hex(random_bytes(24));
     $name = !empty($displayName) ? trim($displayName) : 'CookMate Chef';
     $device = !empty($deviceInfo) ? trim($deviceInfo) : 'CookMate Mobile App';
 

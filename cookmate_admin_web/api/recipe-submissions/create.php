@@ -20,16 +20,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['success' => false, 'message' => 'Method Not Allowed. Use POST.'], 405);
 }
 
-$pdo = get_db_connection();
-$user = get_authenticated_user($pdo, true);
-$userId = (int)$user['id'];
-
 // Parse input
 $input = $_POST;
 if (empty($input) && str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
     $raw = file_get_contents('php://input');
     $input = json_decode($raw, true) ?? [];
 }
+
+$authorDisplayName = trim($input['author_display_name'] ?? '');
+
+$pdo = get_db_connection();
+$user = get_authenticated_user($pdo, true, true, !empty($authorDisplayName) ? $authorDisplayName : null);
+$userId = (int)$user['id'];
 
 $recipeName = trim($input['recipe_name'] ?? $input['title'] ?? '');
 $description = trim($input['description'] ?? '');
@@ -39,13 +41,15 @@ $cookTime = max(0, (int)($input['cooking_time'] ?? $input['cook_time_minutes'] ?
 $servings = max(1, (int)($input['servings'] ?? 4));
 $difficulty = trim($input['difficulty'] ?? 'Medium');
 $cuisine = trim($input['cuisine'] ?? 'Homemade');
-$foodType = trim($input['food_type'] ?? ($input['is_vegetarian'] ? 'Vegetarian' : 'Non-Vegetarian'));
+$foodType = trim($input['food_type'] ?? (!empty($input['is_vegetarian']) ? 'Vegetarian' : 'Non-Vegetarian'));
 $notes = trim($input['notes'] ?? '');
 
 // Permission flags
 $allowPublication = (int)($input['allow_publication'] ?? 0) === 1 ? 1 : 0;
 $showAuthorName = (int)($input['show_author_name'] ?? 0) === 1 ? 1 : 0;
-$authorDisplayName = trim($input['author_display_name'] ?? $user['display_name'] ?? 'CookMate Chef');
+if (empty($authorDisplayName)) {
+    $authorDisplayName = trim($user['display_name'] ?? 'CookMate Chef');
+}
 $permissionGivenAt = $allowPublication ? date('Y-m-d H:i:s') : null;
 
 // Validation

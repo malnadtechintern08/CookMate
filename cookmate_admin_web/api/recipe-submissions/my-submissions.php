@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $pdo = get_db_connection();
-$user = get_authenticated_user($pdo, true);
+$user = get_authenticated_user($pdo, true, true);
 $userId = (int)$user['id'];
 
 try {

@@ -11,7 +11,7 @@ import '../../../../core/errors/exceptions.dart';
 import '../models/recipe_submission_model.dart';
 
 abstract class SubmissionRemoteDataSource {
-  Future<String> getOrInitAuthToken();
+  Future<String> getOrInitAuthToken({bool forceRefresh = false});
   Future<Map<String, dynamic>> submitRecipe({
     required String recipeName,
     required String description,
@@ -81,16 +81,58 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
     return hex.encode(out);
   }
 
+  /// Ensures InfinityFree anti-bot cookie is solved and registered before any POST / multipart calls
+  Future<String?> _ensureInfinityFreeCookie() async {
+    if (_cachedTestCookie != null) {
+      return _cachedTestCookie;
+    }
+
+    try {
+      final headers = <String, String>{
+        'User-Agent': mobileUserAgent,
+        'Accept': 'application/json, text/html, */*',
+      };
+
+      final probeUri = Uri.parse(AppConstants.apiCategoriesEndpoint);
+      final response = await client.get(probeUri, headers: headers).timeout(timeoutDuration);
+
+      if (response.body.contains('slowAES.decrypt') &&
+          response.body.contains('toNumbers(')) {
+        final reg = RegExp(r'toNumbers\("([a-f0-9]+)"\)');
+        final matches = reg.allMatches(response.body).toList();
+        if (matches.length >= 3) {
+          final a = matches[0].group(1)!;
+          final b = matches[1].group(1)!;
+          final c = matches[2].group(1)!;
+          _cachedTestCookie = _solveChallenge(a, b, c);
+
+          // Follow up with redirect GET (?i=1) so OpenResty proxy registers the session
+          headers['Cookie'] = '__test=$_cachedTestCookie';
+          await client.get(
+            Uri.parse('${AppConstants.apiCategoriesEndpoint}?i=1'),
+            headers: headers,
+          ).timeout(timeoutDuration);
+        }
+      }
+    } catch (_) {}
+
+    return _cachedTestCookie;
+  }
+
   @override
-  Future<String> getOrInitAuthToken() async {
+  Future<String> getOrInitAuthToken({bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString(AppConstants.keyUserAuthToken);
 
-    if (token != null && token.isNotEmpty) {
+    // If token exists, forceRefresh is not requested, and it is NOT a local dummy token ("cm_..."), return it
+    if (!forceRefresh && token != null && token.isNotEmpty && !token.startsWith('cm_')) {
       return token;
     }
 
-    // Initialize session with backend
+    // Ensure cookie is established first so POST does not get rejected by OpenResty 400
+    await _ensureInfinityFreeCookie();
+
+    // Register / initialize genuine session with backend
     try {
       final response = await _sendRequest(
         Uri.parse(AppConstants.apiSessionEndpoint),
@@ -98,20 +140,25 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
         body: jsonEncode({
           'display_name': prefs.getString(AppConstants.keyUserDisplayName) ?? 'CookMate Chef',
           'device_info': Platform.operatingSystem,
+          if (token != null && !token.startsWith('cm_')) 'auth_token': token,
         }),
       );
 
       final decoded = jsonDecode(response.body);
-      if (decoded['success'] == true && decoded['data'] != null) {
-        token = decoded['data']['auth_token']?.toString();
-        if (token != null && token.isNotEmpty) {
-          await prefs.setString(AppConstants.keyUserAuthToken, token);
-          return token;
+      if (decoded is Map<String, dynamic> && decoded['success'] == true && decoded['data'] != null) {
+        final serverToken = decoded['data']['auth_token']?.toString();
+        if (serverToken != null && serverToken.isNotEmpty) {
+          await prefs.setString(AppConstants.keyUserAuthToken, serverToken);
+          return serverToken;
         }
       }
     } catch (_) {}
 
-    // Fallback: Generate local token
+    // Fallback: If we had a token, retain it
+    if (token != null && token.isNotEmpty) {
+      return token;
+    }
+
     token = 'cm_${DateTime.now().millisecondsSinceEpoch}_${(1000 + (9999 * (DateTime.now().microsecond / 1000000))).toInt()}';
     await prefs.setString(AppConstants.keyUserAuthToken, token);
     return token;
@@ -123,6 +170,8 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
     Map<String, String>? extraHeaders,
     String? body,
   }) async {
+    await _ensureInfinityFreeCookie();
+
     final headers = <String, String>{
       'User-Agent': mobileUserAgent,
       'Accept': 'application/json, text/html, */*',
@@ -147,7 +196,7 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
       response = await client.get(uri, headers: headers).timeout(timeoutDuration);
     }
 
-    // Handle InfinityFree slowAES challenge
+    // Handle InfinityFree slowAES challenge if cookie expired or missing
     if (response.body.contains('slowAES.decrypt') ||
         (response.body.contains('<script>') && response.body.contains('__test'))) {
       final keyMatch = RegExp(r'toNumbers\("([a-f0-9]+)"\)').allMatches(response.body).toList();
@@ -158,6 +207,15 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
         _cachedTestCookie = _solveChallenge(a, b, c);
 
         headers['Cookie'] = '__test=$_cachedTestCookie';
+
+        // Register cookie with redirect GET first
+        try {
+          await client.get(
+            Uri.parse('${AppConstants.apiCategoriesEndpoint}?i=1'),
+            headers: {'User-Agent': mobileUserAgent, 'Cookie': '__test=$_cachedTestCookie'},
+          ).timeout(timeoutDuration);
+        } catch (_) {}
+
         if (method == 'POST') {
           return await client.post(uri, headers: headers, body: body).timeout(timeoutDuration);
         } else {
@@ -189,51 +247,65 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
     required List<Map<String, dynamic>> steps,
     required List<String> tags,
   }) async {
-    final token = await getOrInitAuthToken();
-    final uri = Uri.parse(AppConstants.apiSubmissionsCreateEndpoint);
+    await _ensureInfinityFreeCookie();
+    var token = await getOrInitAuthToken();
 
-    final request = http.MultipartRequest('POST', uri);
-    request.headers['User-Agent'] = mobileUserAgent;
-    request.headers['Authorization'] = 'Bearer $token';
-    request.headers['X-Cookmate-Token'] = token;
+    Future<http.Response> sendMultipart(String authToken) async {
+      final uri = Uri.parse(AppConstants.apiSubmissionsCreateEndpoint);
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['User-Agent'] = mobileUserAgent;
+      request.headers['Authorization'] = 'Bearer $authToken';
+      request.headers['X-Cookmate-Token'] = authToken;
 
-    if (_cachedTestCookie != null) {
-      request.headers['Cookie'] = '__test=$_cachedTestCookie';
-    }
-
-    // Form fields
-    request.fields['recipe_name'] = recipeName;
-    request.fields['description'] = description;
-    request.fields['category_id'] = categoryId;
-    request.fields['preparation_time'] = prepTime.toString();
-    request.fields['cooking_time'] = cookTime.toString();
-    request.fields['servings'] = servings.toString();
-    request.fields['difficulty'] = difficulty;
-    request.fields['cuisine'] = cuisine;
-    request.fields['food_type'] = foodType;
-    if (notes != null && notes.isNotEmpty) {
-      request.fields['notes'] = notes;
-    }
-    request.fields['allow_publication'] = allowPublication ? '1' : '0';
-    request.fields['show_author_name'] = showAuthorName ? '1' : '0';
-    if (authorDisplayName != null && authorDisplayName.isNotEmpty) {
-      request.fields['author_display_name'] = authorDisplayName;
-    }
-
-    request.fields['ingredients'] = jsonEncode(ingredients);
-    request.fields['steps'] = jsonEncode(steps);
-    request.fields['tags'] = jsonEncode(tags);
-
-    // Attach image if valid file
-    if (imagePath != null && imagePath.isNotEmpty && !imagePath.startsWith('assets/')) {
-      final file = File(imagePath);
-      if (await file.exists()) {
-        request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+      if (_cachedTestCookie != null) {
+        request.headers['Cookie'] = '__test=$_cachedTestCookie';
       }
+
+      // Form fields
+      request.fields['auth_token'] = authToken;
+      request.fields['recipe_name'] = recipeName;
+      request.fields['description'] = description;
+      request.fields['category_id'] = categoryId;
+      request.fields['preparation_time'] = prepTime.toString();
+      request.fields['cooking_time'] = cookTime.toString();
+      request.fields['servings'] = servings.toString();
+      request.fields['difficulty'] = difficulty;
+      request.fields['cuisine'] = cuisine;
+      request.fields['food_type'] = foodType;
+      if (notes != null && notes.isNotEmpty) {
+        request.fields['notes'] = notes;
+      }
+      request.fields['allow_publication'] = allowPublication ? '1' : '0';
+      request.fields['show_author_name'] = showAuthorName ? '1' : '0';
+      if (authorDisplayName != null && authorDisplayName.isNotEmpty) {
+        request.fields['author_display_name'] = authorDisplayName;
+      }
+
+      request.fields['ingredients'] = jsonEncode(ingredients);
+      request.fields['steps'] = jsonEncode(steps);
+      request.fields['tags'] = jsonEncode(tags);
+
+      // Attach image if valid file
+      if (imagePath != null && imagePath.isNotEmpty && !imagePath.startsWith('assets/')) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+        }
+      }
+
+      final streamed = await client.send(request).timeout(timeoutDuration);
+      return await http.Response.fromStream(streamed);
     }
 
-    final streamed = await client.send(request).timeout(timeoutDuration);
-    final response = await http.Response.fromStream(streamed);
+    var response = await sendMultipart(token);
+
+    // If 401 Unauthorized, automatically invalidate cached token, refresh session, and retry ONCE
+    if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.keyUserAuthToken);
+      token = await getOrInitAuthToken(forceRefresh: true);
+      response = await sendMultipart(token);
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -250,10 +322,10 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
 
   @override
   Future<List<RecipeSubmissionModel>> getMySubmissions() async {
-    final token = await getOrInitAuthToken();
+    var token = await getOrInitAuthToken();
     final uri = Uri.parse(AppConstants.apiSubmissionsMyEndpoint);
 
-    final response = await _sendRequest(
+    var response = await _sendRequest(
       uri,
       extraHeaders: {
         'Authorization': 'Bearer $token',
@@ -261,9 +333,22 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
       },
     );
 
+    if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.keyUserAuthToken);
+      token = await getOrInitAuthToken(forceRefresh: true);
+      response = await _sendRequest(
+        uri,
+        extraHeaders: {
+          'Authorization': 'Bearer $token',
+          'X-Cookmate-Token': token,
+        },
+      );
+    }
+
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      if (decoded['success'] == true && decoded['data'] is List) {
+      if (decoded is Map<String, dynamic> && decoded['success'] == true && decoded['data'] is List) {
         return (decoded['data'] as List)
             .map((item) => RecipeSubmissionModel.fromJson(item as Map<String, dynamic>))
             .toList();
@@ -276,10 +361,10 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
 
   @override
   Future<RecipeSubmissionModel> getSubmissionDetails(int id) async {
-    final token = await getOrInitAuthToken();
+    var token = await getOrInitAuthToken();
     final uri = Uri.parse('${AppConstants.apiSubmissionsDetailsEndpoint}?id=$id');
 
-    final response = await _sendRequest(
+    var response = await _sendRequest(
       uri,
       extraHeaders: {
         'Authorization': 'Bearer $token',
@@ -287,9 +372,22 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
       },
     );
 
+    if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.keyUserAuthToken);
+      token = await getOrInitAuthToken(forceRefresh: true);
+      response = await _sendRequest(
+        uri,
+        extraHeaders: {
+          'Authorization': 'Bearer $token',
+          'X-Cookmate-Token': token,
+        },
+      );
+    }
+
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      if (decoded['success'] == true && decoded['data'] != null) {
+      if (decoded is Map<String, dynamic> && decoded['success'] == true && decoded['data'] != null) {
         return RecipeSubmissionModel.fromJson(decoded['data'] as Map<String, dynamic>);
       }
       throw const ServerException(message: 'Invalid submission details response.');
@@ -319,45 +417,58 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
     required List<Map<String, dynamic>> steps,
     required List<String> tags,
   }) async {
-    final token = await getOrInitAuthToken();
-    final uri = Uri.parse(AppConstants.apiSubmissionsUpdateEndpoint);
+    await _ensureInfinityFreeCookie();
+    var token = await getOrInitAuthToken();
 
-    final request = http.MultipartRequest('POST', uri);
-    request.headers['User-Agent'] = mobileUserAgent;
-    request.headers['Authorization'] = 'Bearer $token';
-    request.headers['X-Cookmate-Token'] = token;
+    Future<http.Response> sendMultipart(String authToken) async {
+      final uri = Uri.parse(AppConstants.apiSubmissionsUpdateEndpoint);
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['User-Agent'] = mobileUserAgent;
+      request.headers['Authorization'] = 'Bearer $authToken';
+      request.headers['X-Cookmate-Token'] = authToken;
 
-    if (_cachedTestCookie != null) {
-      request.headers['Cookie'] = '__test=$_cachedTestCookie';
-    }
-
-    request.fields['id'] = id.toString();
-    request.fields['recipe_name'] = recipeName;
-    request.fields['description'] = description;
-    request.fields['category_id'] = categoryId;
-    request.fields['preparation_time'] = prepTime.toString();
-    request.fields['cooking_time'] = cookTime.toString();
-    request.fields['servings'] = servings.toString();
-    request.fields['difficulty'] = difficulty;
-    request.fields['cuisine'] = cuisine;
-    request.fields['food_type'] = foodType;
-    if (notes != null) request.fields['notes'] = notes;
-    request.fields['allow_publication'] = allowPublication ? '1' : '0';
-    request.fields['show_author_name'] = showAuthorName ? '1' : '0';
-    if (authorDisplayName != null) request.fields['author_display_name'] = authorDisplayName;
-    request.fields['ingredients'] = jsonEncode(ingredients);
-    request.fields['steps'] = jsonEncode(steps);
-    request.fields['tags'] = jsonEncode(tags);
-
-    if (imagePath != null && imagePath.isNotEmpty && !imagePath.startsWith('assets/')) {
-      final file = File(imagePath);
-      if (await file.exists()) {
-        request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+      if (_cachedTestCookie != null) {
+        request.headers['Cookie'] = '__test=$_cachedTestCookie';
       }
+
+      request.fields['auth_token'] = authToken;
+      request.fields['id'] = id.toString();
+      request.fields['recipe_name'] = recipeName;
+      request.fields['description'] = description;
+      request.fields['category_id'] = categoryId;
+      request.fields['preparation_time'] = prepTime.toString();
+      request.fields['cooking_time'] = cookTime.toString();
+      request.fields['servings'] = servings.toString();
+      request.fields['difficulty'] = difficulty;
+      request.fields['cuisine'] = cuisine;
+      request.fields['food_type'] = foodType;
+      if (notes != null) request.fields['notes'] = notes;
+      request.fields['allow_publication'] = allowPublication ? '1' : '0';
+      request.fields['show_author_name'] = showAuthorName ? '1' : '0';
+      if (authorDisplayName != null) request.fields['author_display_name'] = authorDisplayName;
+      request.fields['ingredients'] = jsonEncode(ingredients);
+      request.fields['steps'] = jsonEncode(steps);
+      request.fields['tags'] = jsonEncode(tags);
+
+      if (imagePath != null && imagePath.isNotEmpty && !imagePath.startsWith('assets/')) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+        }
+      }
+
+      final streamed = await client.send(request).timeout(timeoutDuration);
+      return await http.Response.fromStream(streamed);
     }
 
-    final streamed = await client.send(request).timeout(timeoutDuration);
-    final response = await http.Response.fromStream(streamed);
+    var response = await sendMultipart(token);
+
+    if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.keyUserAuthToken);
+      token = await getOrInitAuthToken(forceRefresh: true);
+      response = await sendMultipart(token);
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -368,18 +479,33 @@ class SubmissionRemoteDataSourceImpl implements SubmissionRemoteDataSource {
 
   @override
   Future<bool> withdrawSubmission(int id) async {
-    final token = await getOrInitAuthToken();
+    var token = await getOrInitAuthToken();
     final uri = Uri.parse(AppConstants.apiSubmissionsWithdrawEndpoint);
 
-    final response = await _sendRequest(
+    var response = await _sendRequest(
       uri,
       method: 'POST',
       extraHeaders: {
         'Authorization': 'Bearer $token',
         'X-Cookmate-Token': token,
       },
-      body: jsonEncode({'id': id}),
+      body: jsonEncode({'id': id, 'auth_token': token}),
     );
+
+    if (response.statusCode == 401) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.keyUserAuthToken);
+      token = await getOrInitAuthToken(forceRefresh: true);
+      response = await _sendRequest(
+        uri,
+        method: 'POST',
+        extraHeaders: {
+          'Authorization': 'Bearer $token',
+          'X-Cookmate-Token': token,
+        },
+        body: jsonEncode({'id': id, 'auth_token': token}),
+      );
+    }
 
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
