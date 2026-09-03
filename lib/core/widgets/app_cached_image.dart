@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
 
 class AppCachedImage extends StatelessWidget {
@@ -71,6 +73,27 @@ class AppCachedImage extends StatelessWidget {
         fadeOutDuration: const Duration(milliseconds: 150),
         placeholder: (context, url) => placeholderWidget,
         errorWidget: (context, url, error) => errorWidget,
+      );
+    } else if (trimmed.startsWith('uploads/') || trimmed.startsWith('/uploads/')) {
+      final serverUrl = '${AppConstants.apiBaseUrl}/${trimmed.replaceFirst(RegExp(r'^/+'), '')}';
+      imageWidget = CachedNetworkImage(
+        imageUrl: serverUrl,
+        width: width ?? double.infinity,
+        height: height ?? double.infinity,
+        fit: fit,
+        fadeInDuration: const Duration(milliseconds: 200),
+        fadeOutDuration: const Duration(milliseconds: 150),
+        placeholder: (context, url) => placeholderWidget,
+        errorWidget: (context, url, error) => errorWidget,
+      );
+    } else if (trimmed.startsWith('/') || trimmed.startsWith('file://')) {
+      final file = File(trimmed.replaceFirst('file://', ''));
+      imageWidget = Image.file(
+        file,
+        width: width ?? double.infinity,
+        height: height ?? double.infinity,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => errorWidget,
       );
     } else if (trimmed.isNotEmpty) {
       imageWidget = Image.asset(

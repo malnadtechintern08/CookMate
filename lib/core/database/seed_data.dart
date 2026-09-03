@@ -19,7 +19,7 @@ class SeedData {
       'id': 'cat_lunch_dinner',
       'name': 'Lunch & Dinner',
       'icon_name': 'dinner_dining',
-      'color_hex': '0xFFFF6B35',
+      'color_hex': '0xFFE50914',
       'description': 'Aromatic biryanis, royal curries, dal tadka, and steaming rice dishes.',
     },
     {

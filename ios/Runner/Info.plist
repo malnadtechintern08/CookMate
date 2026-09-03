@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>CookMate needs camera access so you can photograph your recipes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CookMate needs access to your gallery so you can choose photos for your recipes.</string>
 </dict>
 </plist>

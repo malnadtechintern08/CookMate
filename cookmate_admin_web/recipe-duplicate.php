@@ -5,8 +5,9 @@
 require_once __DIR__ . '/config/db.php';
 $pdo = get_db_connection();
 
-$id = trim($_GET['id'] ?? '');
+$id = trim($_POST['id'] ?? $_GET['id'] ?? '');
 if (empty($id)) {
+    set_flash_message('warning', 'No recipe specified for duplication.');
     header('Location: ' . BASE_URL . '/recipes.php');
     exit;
 }
@@ -17,7 +18,7 @@ try {
     $rec = $stmt->fetch();
 
     if (!$rec) {
-        set_flash_message('danger', 'Original recipe not found.');
+        set_flash_message('danger', 'Original recipe not found in database.');
         header('Location: ' . BASE_URL . '/recipes.php');
         exit;
     }
@@ -42,6 +43,10 @@ try {
         $rec['rating'], $rec['region'], $rec['subcategory'], $rec['nutrition']
     ]);
 
+    if ($inStmt->rowCount() === 0) {
+        throw new Exception("Failed to insert duplicated recipe into database.");
+    }
+
     // Clone ingredients
     $ingStmt = $pdo->prepare("SELECT * FROM recipe_ingredients WHERE recipe_id = ? ORDER BY sort_order ASC");
     $ingStmt->execute([$id]);
@@ -50,7 +55,7 @@ try {
     $ingInsert = $pdo->prepare("INSERT INTO recipe_ingredients (id, recipe_id, name, amount, unit, notes, is_optional, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     foreach ($ingredients as $idx => $ing) {
         $newIngId = $newId . '_ing_' . ($idx + 1) . '_' . bin2hex(random_bytes(2));
-        $ingInsert->execute([$newIngId, $newId, $ing['name'], $ing['amount'], $ing['unit'], $ing['notes'], $ing['is_optional'], $ing['sort_order']]);
+        $ingInsert->execute([$newIngId, $newId, $ing['name'], $ing['amount'], $ing['unit'], $ing['notes'], $ing['is_optional'] ?? 0, $ing['sort_order'] ?? ($idx + 1)]);
     }
 
     // Clone steps

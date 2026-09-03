@@ -1,14 +1,16 @@
 import '../../domain/entities/recipe.dart';
 import '../../domain/repositories/recipe_repository.dart';
 import '../datasources/recipe_local_datasource.dart';
+import '../datasources/recipe_remote_datasource.dart';
 import '../models/ingredient_model.dart';
 import '../models/instruction_step_model.dart';
 import '../models/recipe_model.dart';
 
 class RecipeRepositoryImpl implements RecipeRepository {
   final RecipeLocalDataSource localDataSource;
+  final RecipeRemoteDataSource? remoteDataSource;
 
-  RecipeRepositoryImpl(this.localDataSource);
+  RecipeRepositoryImpl(this.localDataSource, [this.remoteDataSource]);
 
   RecipeModel _toModel(Recipe recipe) {
     return RecipeModel(
@@ -43,12 +45,51 @@ class RecipeRepositoryImpl implements RecipeRepository {
 
   @override
   Future<List<Recipe>> getAllRecipes() async {
+    final local = await localDataSource.getAllRecipes();
+    if (local.isEmpty && remoteDataSource != null) {
+      try {
+        final remote = await remoteDataSource!.fetchRecipes(limit: 500);
+        if (remote.isNotEmpty) {
+          await localDataSource.upsertRecipes(remote);
+          return await localDataSource.getAllRecipes();
+        }
+      } catch (_) {
+        // Fall back gracefully to local
+      }
+    }
+    return local;
+  }
+
+  @override
+  Future<List<Recipe>> syncRecipesWithServer() async {
+    if (remoteDataSource != null) {
+      try {
+        final remote = await remoteDataSource!.fetchRecipes(limit: 500);
+        if (remote.isNotEmpty) {
+          await localDataSource.upsertRecipes(remote);
+        }
+      } catch (_) {
+        // If offline or server error, retain local data
+      }
+    }
     return await localDataSource.getAllRecipes();
   }
 
   @override
   Future<Recipe?> getRecipeById(String id) async {
-    return await localDataSource.getRecipeById(id);
+    final local = await localDataSource.getRecipeById(id);
+    if (local != null) return local;
+
+    if (remoteDataSource != null) {
+      try {
+        final remote = await remoteDataSource!.fetchRecipeById(id);
+        if (remote != null) {
+          await localDataSource.upsertRecipes([remote]);
+          return remote;
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   @override

@@ -12,6 +12,7 @@ import '../../../categories/presentation/widgets/category_card_widget.dart';
 import '../../domain/entities/recipe.dart';
 import '../providers/recently_viewed_provider.dart';
 import '../providers/recipe_providers.dart';
+import '../../../tags/presentation/providers/tag_providers.dart';
 import '../widgets/featured_recipe_card.dart';
 import '../widgets/recipe_card.dart';
 import '../widgets/recipe_filter_bottom_sheet.dart';
@@ -25,6 +26,16 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _selectedCategoryKey = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await ref.read(syncRecipesWithServerProvider.future);
+      } catch (_) {}
+    });
+  }
 
   final List<Map<String, dynamic>> _chipDefs = [
     {'key': 'all', 'icon': Icons.apps_rounded},
@@ -77,8 +88,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        color: AppColors.primaryOrange,
+        onRefresh: () async {
+          try {
+            await ref.read(syncRecipesWithServerProvider.future);
+          } catch (_) {}
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // Top Header App Bar
           SliverAppBar(
             floating: true,
@@ -124,8 +143,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       color: isDark ? Colors.white : AppColors.lightTextPrimary,
                                     ),
                                     children: [
-                                      TextSpan(text: 'Cook', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                                      const TextSpan(text: 'Mate', style: TextStyle(color: AppColors.nonVegRed)),
+                                      TextSpan(text: 'Cook', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w900)),
+                                      const TextSpan(text: 'Mate', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900)),
                                     ],
                                   ),
                                 ),
@@ -165,7 +184,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              onPressed: () => context.push('/submit-recipe'),
+                              icon: const Icon(Icons.post_add_rounded, color: AppColors.primaryOrange),
+                              tooltip: 'Submit Recipe for Review',
+                            ),
+                            const SizedBox(width: 4),
                             IconButton(
                               onPressed: () => context.pushNamed(RouteNames.settings),
                               icon: const Icon(Icons.settings_outlined),
@@ -461,6 +486,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     error: (err, stack) => const SizedBox.shrink(),
                   ),
 
+                  // SECTION: 🏷️ Trending Hashtags Discovery (Instagram-Style)
+                  _buildExploreByHashtagSection(context, ref, isDark),
+
                   // SECTION 3: 🌿 Taste of Malnad (Dedicated Special Section)
                   if (malnadRecipes.isNotEmpty) ...[
                     _buildSectionHeader(
@@ -631,6 +659,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -638,6 +667,128 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     context.pushNamed(
       RouteNames.recipeDetail,
       pathParameters: {'id': id},
+    );
+  }
+
+  Widget _buildExploreByHashtagSection(BuildContext context, WidgetRef ref, bool isDark) {
+    final popularTagsAsync = ref.watch(popularTagsProvider);
+
+    return popularTagsAsync.when(
+      data: (tags) {
+        if (tags.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.tag_rounded, size: 20, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text(
+                        'Trending Hashtags',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: () => context.pushNamed(RouteNames.search),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    child: const Text(
+                      'Search #',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 42,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: tags.length,
+                itemBuilder: (ctx, idx) {
+                  final tag = tags[idx];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: InkWell(
+                      onTap: () {
+                        ref.read(recentSearchesProvider.notifier).addSearch('#${tag.name}');
+                        context.pushNamed(
+                          RouteNames.hashtagResults,
+                          pathParameters: {'tag': tag.name},
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              '#',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              tag.name,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            if (tag.usageCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '${tag.usageCount}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (err, stack) => const SizedBox.shrink(),
     );
   }
 

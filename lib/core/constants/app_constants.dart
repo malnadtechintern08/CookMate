@@ -20,4 +20,25 @@ class AppConstants {
   // Quick Launch Filter threshold
   static const int quickLaunchMaxMinutes = 30;
   static const int maxRecentlyViewed = 10;
+
+  // Live Backend Server API Configuration
+  static const String apiBaseUrl = 'https://cookmate.free.nf';
+  static const String apiRecipesEndpoint = '$apiBaseUrl/api/recipes.php';
+  static const String apiCategoriesEndpoint = '$apiBaseUrl/api/categories.php';
+  static const String apiTagsPopularEndpoint = '$apiBaseUrl/api/tags/popular.php';
+  static const String apiTagsSearchEndpoint = '$apiBaseUrl/api/tags/search.php';
+  static const String apiTagsRecipesEndpoint = '$apiBaseUrl/api/tags/recipes.php';
+  static const String apiSearchEndpoint = '$apiBaseUrl/api/search.php';
+  static const String keyRecentSearches = 'cookmate_recent_searches';
+  static const String keyUserAuthToken = 'cookmate_user_auth_token';
+  static const String keyUserDisplayName = 'cookmate_user_display_name';
+
+  // Submissions & Moderation APIs
+  static const String apiSessionEndpoint = '$apiBaseUrl/api/auth/session.php';
+  static const String apiSubmissionsCreateEndpoint = '$apiBaseUrl/api/recipe-submissions/create.php';
+  static const String apiSubmissionsMyEndpoint = '$apiBaseUrl/api/recipe-submissions/my-submissions.php';
+  static const String apiSubmissionsDetailsEndpoint = '$apiBaseUrl/api/recipe-submissions/details.php';
+  static const String apiSubmissionsUpdateEndpoint = '$apiBaseUrl/api/recipe-submissions/update.php';
+  static const String apiSubmissionsWithdrawEndpoint = '$apiBaseUrl/api/recipe-submissions/withdraw.php';
+  static const String apiNotificationsEndpoint = '$apiBaseUrl/api/notifications/index.php';
 }

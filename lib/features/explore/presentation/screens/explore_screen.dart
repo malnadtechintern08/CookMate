@@ -65,8 +65,14 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        color: AppColors.primaryOrange,
+        onRefresh: () async {
+          await ref.read(syncRecipesWithServerProvider.future).catchError((_) => <Recipe>[]);
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // Banner for Malnad Heritage
           SliverToBoxAdapter(
             child: Padding(
@@ -227,6 +233,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

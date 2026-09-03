@@ -39,7 +39,7 @@ $insStmt->execute([$id]);
 $instructions = $insStmt->fetchAll();
 
 $thumb = !empty($recipe['image_url']) ? BASE_URL . '/' . ltrim($recipe['image_url'], '/') : BASE_URL . '/assets/images/app_icon.png';
-$catColor = !empty($recipe['category_color']) ? str_replace('0xFF', '#', $recipe['category_color']) : '#FF6B35';
+$catColor = !empty($recipe['category_color']) ? str_replace('0xFF', '#', $recipe['category_color']) : '#E50914';
 
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -163,12 +163,19 @@ require_once __DIR__ . '/includes/header.php';
 
             <?php if (!empty($recipe['tags'])): ?>
                 <div>
-                    <span style="font-size: 12px; font-weight: 800; color: var(--cm-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Tags</span>
+                    <span style="font-size: 12px; font-weight: 800; color: var(--cm-primary); text-transform: uppercase; letter-spacing: 0.5px;">
+                        <i class="fa-solid fa-hashtag me-1"></i> Hashtags
+                    </span>
                     <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
-                        <?php foreach (explode(',', $recipe['tags']) as $t): ?>
-                            <span class="badge" style="background: #262626; color: #CCCCCC; font-size: 11px;">
-                                <?= htmlspecialchars(trim($t)) ?>
-                            </span>
+                        <?php 
+                        require_once __DIR__ . '/includes/tag_functions.php';
+                        foreach (explode(',', $recipe['tags']) as $t): 
+                            $cleanT = normalize_tag($t);
+                            if ($cleanT === '') continue;
+                        ?>
+                            <a href="<?= BASE_URL ?>/recipes.php?q=%23<?= urlencode($cleanT) ?>" class="hashtag-chip" style="text-decoration:none; font-size:12px; padding:4px 10px;" title="View all recipes tagged #<?= htmlspecialchars($cleanT) ?>">
+                                #<?= htmlspecialchars($cleanT) ?>
+                            </a>
                         <?php endforeach; ?>
                     </div>
                 </div>

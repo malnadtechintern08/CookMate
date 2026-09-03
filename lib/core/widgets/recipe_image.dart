@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
 
 class RecipeImage extends StatelessWidget {
@@ -47,6 +49,24 @@ class RecipeImage extends StatelessWidget {
     } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       imageContent = Image.network(
         trimmed,
+        width: width ?? double.infinity,
+        height: height ?? double.infinity,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => errorWidget,
+      );
+    } else if (trimmed.startsWith('uploads/') || trimmed.startsWith('/uploads/')) {
+      final serverUrl = '${AppConstants.apiBaseUrl}/${trimmed.replaceFirst(RegExp(r'^/+'), '')}';
+      imageContent = Image.network(
+        serverUrl,
+        width: width ?? double.infinity,
+        height: height ?? double.infinity,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => errorWidget,
+      );
+    } else if (trimmed.startsWith('/') || trimmed.startsWith('file://')) {
+      final file = File(trimmed.replaceFirst('file://', ''));
+      imageContent = Image.file(
+        file,
         width: width ?? double.infinity,
         height: height ?? double.infinity,
         fit: fit,

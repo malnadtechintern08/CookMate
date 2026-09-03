@@ -49,7 +49,7 @@ require_once __DIR__ . '/includes/header.php';
         </div>
 
         <p style="color: var(--cm-text-secondary); font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
-            Export the current contents of your MySQL <code>cookmate_db</code> database into various formats to sync with the mobile app or create backups.
+            Export the current contents of your MySQL <code><?= htmlspecialchars(DB_NAME) ?></code> database into various formats to sync with the mobile app or create backups.
         </p>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
@@ -71,12 +71,30 @@ require_once __DIR__ . '/includes/header.php';
                 </a>
             </div>
 
+            <!-- Export SQL Database Dump -->
+            <div style="background: var(--cm-surface); border: 1px solid var(--cm-border); border-radius: 14px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <span style="width: 40px; height: 40px; border-radius: 10px; background: rgba(76, 175, 80, 0.15); color: #4CAF50; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                            <i class="fa-solid fa-database"></i>
+                        </span>
+                        <h3 style="font-size: 17px; margin: 0;">Export SQL Backup</h3>
+                    </div>
+                    <p style="color: var(--cm-text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 20px;">
+                        Clean MySQL database dump (.sql) with schema, 200 recipes & categories ready to import on any host.
+                    </p>
+                </div>
+                <a href="<?= BASE_URL ?>/export.php?action=download_sql" class="btn btn-secondary" style="width: 100%; border-color: rgba(76, 175, 80, 0.4); color: #81C784;">
+                    <i class="fa-solid fa-file-arrow-down"></i> Download SQL Dump
+                </a>
+            </div>
+
             <!-- phpMyAdmin Direct Access -->
             <div style="background: var(--cm-surface); border: 1px solid var(--cm-border); border-radius: 14px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                         <span style="width: 40px; height: 40px; border-radius: 10px; background: rgba(255, 179, 0, 0.15); color: var(--cm-gold); display: flex; align-items: center; justify-content: center; font-size: 18px;">
-                            <i class="fa-solid fa-database"></i>
+                            <i class="fa-solid fa-server"></i>
                         </span>
                         <h3 style="font-size: 17px; margin: 0;">phpMyAdmin Manager</h3>
                     </div>

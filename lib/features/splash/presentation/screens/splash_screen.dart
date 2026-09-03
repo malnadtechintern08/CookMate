@@ -113,8 +113,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           letterSpacing: -0.5,
                         ),
                         children: [
-                          TextSpan(text: 'Cook', style: TextStyle(color: Colors.white)),
-                          TextSpan(text: 'Mate', style: TextStyle(color: AppColors.nonVegRed)),
+                          TextSpan(text: 'Cook', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                          TextSpan(text: 'Mate', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900)),
                         ],
                       ),
                     ),

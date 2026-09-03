@@ -9,8 +9,33 @@ $status = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
     try {
-        $dsn = "mysql:host=localhost;charset=utf8mb4";
-        $pdo = new PDO($dsn, DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $pdo = null;
+        try {
+            // Attempt to connect directly to the target database
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+        } catch (PDOException $connEx) {
+            // If database does not exist, try creating it (works if user has CREATE DATABASE privilege)
+            try {
+                $serverDsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";charset=utf8mb4";
+                $serverPdo = new PDO($serverDsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                ]);
+                $cleanDbName = str_replace('`', '', DB_NAME);
+                $serverPdo->exec("CREATE DATABASE IF NOT EXISTS `{$cleanDbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                
+                $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                ]);
+            } catch (Exception $createEx) {
+                // Throw the original connection error with actionable advice
+                throw new Exception("Unable to connect to database `" . DB_NAME . "` (" . $connEx->getMessage() . "). Please ensure the database exists in your hosting cPanel/phpMyAdmin and credentials in `config/db.php` are correct.");
+            }
+        }
 
         $sqlFile = __DIR__ . '/data/seed_data.sql';
         if (!file_exists($sqlFile)) {
@@ -18,14 +43,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
         }
 
         $sql = file_get_contents($sqlFile);
+
+        // Strip CREATE DATABASE and USE statements so it imports cleanly into any assigned host DB
+        $sql = preg_replace('/CREATE\s+DATABASE\s+[^;]+;/i', '', $sql);
+        $sql = preg_replace('/USE\s+[^;]+;/i', '', $sql);
+
         $pdo->exec($sql);
 
-        // Verify count
-        $verifyPdo = new PDO("mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4", DB_USER, DB_PASS);
-        $catCount = $verifyPdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
-        $recCount = $verifyPdo->query("SELECT COUNT(*) FROM recipes")->fetchColumn();
+        // Run hashtag migration if tags table does not exist or is empty
+        $tagMigrationFile = __DIR__ . '/migrations/001_create_hashtag_tables.sql';
+        if (file_exists($tagMigrationFile)) {
+            $pdo->exec(file_get_contents($tagMigrationFile));
+            require_once __DIR__ . '/includes/tag_functions.php';
+            recalculate_all_tag_usage_counts($pdo);
+        }
 
-        $message = "Database `cookmate_db` initialized successfully! Loaded $recCount recipes and $catCount categories.";
+        // Run recipe submissions migration
+        $subMigrationFile = __DIR__ . '/migrations/002_create_recipe_submissions.sql';
+        if (file_exists($subMigrationFile)) {
+            $pdo->exec(file_get_contents($subMigrationFile));
+        }
+
+        // Verify count
+        $catCount = $pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
+        $recCount = $pdo->query("SELECT COUNT(*) FROM recipes")->fetchColumn();
+        $tagCount = $pdo->query("SELECT COUNT(*) FROM tags")->fetchColumn();
+
+        $message = "Database `" . htmlspecialchars(DB_NAME) . "` initialized successfully! Loaded $recCount recipes, $catCount categories, and $tagCount hashtags.";
         $status = 'success';
     } catch (Exception $e) {
         $message = "Error: " . $e->getMessage();
@@ -48,10 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
             --bg-color: #0E0E0E;
             --card-bg: #1A1A1A;
             --border-color: #262626;
-            --primary-orange: #FF6B35;
-            --secondary-orange: #FF8C42;
+            --primary-orange: #E50914;
+            --secondary-orange: #FF2E36;
             --veg-green: #4CAF50;
-            --non-veg-red: #E53935;
+            --non-veg-red: #E50914;
             --text-primary: #FFFFFF;
             --text-secondary: #A5A5A5;
         }
@@ -124,12 +168,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
             font-weight: 700;
             cursor: pointer;
             text-decoration: none;
-            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+            box-shadow: 0 6px 20px rgba(229, 9, 20, 0.4);
             transition: all 0.2s ease;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(255, 107, 53, 0.5);
+            box-shadow: 0 8px 24px rgba(229, 9, 20, 0.5);
         }
         .btn-secondary {
             display: inline-block;
@@ -163,8 +207,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
 <body>
     <div class="setup-card">
         <img src="<?= BASE_URL ?>/assets/images/cookmate_logo.png" alt="CookMate" class="logo-img">
-        <h1><span style="color: #FFFFFF; font-weight: 800;">Cook</span><span style="color: #E53935; font-weight: 800;">Mate</span> Database Setup</h1>
-        <p class="subtitle">Initialize the MySQL database <code>cookmate_db</code> and import all 200 authentic recipes and 8 categories directly into phpMyAdmin.</p>
+        <h1><span class="brand-cookmate" style="font-family:'Outfit',sans-serif;font-weight:800;display:inline-flex;align-items:baseline;"><span class="cook-part" style="color:#FFFFFF !important;font-weight:800;">Cook</span><span class="mate-part" style="color:#E50915 !important;font-weight:800;">Mate</span></span> Database Setup</h1>
+        <p class="subtitle">Initialize the MySQL database <code><?= htmlspecialchars(DB_NAME) ?></code> and import all 200 authentic recipes and 8 categories directly into phpMyAdmin.</p>
 
         <?php if ($message): ?>
             <div class="alert alert-<?= $status ?>">

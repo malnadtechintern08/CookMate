@@ -32,6 +32,12 @@ $recentRecipes = $pdo->query("
     LIMIT 10
 ")->fetchAll();
 
+// Query pending submissions
+$pendingSubmissions = 0;
+try {
+    $pendingSubmissions = (int)$pdo->query("SELECT COUNT(*) FROM recipe_submissions WHERE status = 'pending'")->fetchColumn();
+} catch (Exception $e) {}
+
 require_once __DIR__ . '/includes/header.php';
 ?>
 
@@ -44,6 +50,25 @@ require_once __DIR__ . '/includes/header.php';
         Control your culinary catalog, customize recipes, and manage database records.
     </p>
 </div>
+
+<?php if ($pendingSubmissions > 0): ?>
+    <div style="background: linear-gradient(135deg, rgba(229, 9, 20, 0.2), rgba(229, 9, 20, 0.05)); border: 1px solid rgba(229, 9, 20, 0.4); border-radius: 14px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 42px; height: 42px; border-radius: 10px; background: var(--cm-primary); color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                <i class="fa-solid fa-bell"></i>
+            </div>
+            <div>
+                <strong style="color: #FFF; font-size: 15px; display: block;">
+                    🔔 <?= $pendingSubmissions ?> New Recipe Submission<?= $pendingSubmissions > 1 ? 's' : '' ?> Awaiting Moderation
+                </strong>
+                <span style="color: #CCC; font-size: 13px;">App users have submitted recipes for review and publication into CookMate.</span>
+            </div>
+        </div>
+        <a href="<?= BASE_URL ?>/recipe-submissions.php?status=pending" class="btn btn-primary btn-sm" style="padding: 8px 18px;">
+            Review Submissions &rarr;
+        </a>
+    </div>
+<?php endif; ?>
 
 <!-- Statistics Overview Cards -->
 <div class="stats-grid">
@@ -110,7 +135,7 @@ require_once __DIR__ . '/includes/header.php';
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
         <?php foreach ($categories as $cat): ?>
             <?php 
-                $hex = !empty($cat['color_hex']) ? str_replace('0xFF', '#', $cat['color_hex']) : '#FF6B35';
+                $hex = !empty($cat['color_hex']) ? str_replace('0xFF', '#', $cat['color_hex']) : '#E50914';
             ?>
             <a href="<?= BASE_URL ?>/recipes.php?category=<?= urlencode($cat['id']) ?>" 
                style="display: flex; flex-direction: column; background: var(--cm-surface); border: 1px solid var(--cm-border); border-radius: 14px; padding: 16px; text-decoration: none; transition: transform 0.2s, border-color 0.2s;"
@@ -162,7 +187,7 @@ require_once __DIR__ . '/includes/header.php';
                 <?php foreach ($recentRecipes as $r): ?>
                     <?php
                         $thumb = !empty($r['image_url']) ? BASE_URL . '/' . ltrim($r['image_url'], '/') : BASE_URL . '/assets/images/app_icon.png';
-                        $catColor = !empty($r['category_color']) ? str_replace('0xFF', '#', $r['category_color']) : '#FF6B35';
+                        $catColor = !empty($r['category_color']) ? str_replace('0xFF', '#', $r['category_color']) : '#E50914';
                     ?>
                     <tr>
                         <td>

@@ -1,0 +1,46 @@
+# CookMate Web Admin - Production Apache Configuration
+# ----------------------------------------------------
+
+# 1. Prevent Directory Browsing
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
+
+# 2. Set Default Charset
+AddDefaultCharset UTF-8
+
+# 3. Deny direct web access to sensitive directories and file types
+<FilesMatch "(?i)^(\.env|\.git.*|composer\.(json|lock)|package\.json|.*\.sql|.*\.md)$">
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+
+# 4. Security Headers (if mod_headers is enabled)
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# 5. PHP Upload & Execution Settings (adjust if needed on server)
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value memory_limit 128M
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value memory_limit 128M
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value memory_limit 128M
+</IfModule>

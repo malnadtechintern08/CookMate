@@ -18,4 +18,7 @@ class RouteNames {
   static const String noteDetail = 'note_detail';
   static const String noteCreate = 'note_create';
   static const String noteEdit = 'note_edit';
+  static const String hashtagResults = 'hashtag_results';
+  static const String submitRecipe = 'submit_recipe';
+  static const String mySubmissions = 'my_submissions';
 }

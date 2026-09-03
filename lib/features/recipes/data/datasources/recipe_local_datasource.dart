@@ -23,6 +23,7 @@ abstract class RecipeLocalDataSource {
   Future<void> createRecipe(RecipeModel recipe);
   Future<void> updateRecipe(RecipeModel recipe);
   Future<void> deleteRecipe(String recipeId);
+  Future<void> upsertRecipes(List<RecipeModel> recipes);
 }
 
 class RecipeLocalDataSourceImpl implements RecipeLocalDataSource {
@@ -196,28 +197,36 @@ class RecipeLocalDataSourceImpl implements RecipeLocalDataSource {
     try {
       final db = await databaseService.database;
       final cleanQuery = query.trim().toLowerCase();
+      final isHashtag = cleanQuery.startsWith('#');
+      final tagKeyword = isHashtag ? cleanQuery.replaceFirst(RegExp(r'^#+'), '') : cleanQuery;
 
       final List<String> whereClauses = [];
       final List<dynamic> whereArgs = [];
 
       if (cleanQuery.isNotEmpty) {
-        whereClauses.add('''
-          (
-            LOWER(r.title) LIKE ? OR
-            LOWER(r.description) LIKE ? OR
-            LOWER(r.chef_name) LIKE ? OR
-            LOWER(r.cuisine) LIKE ? OR
-            LOWER(r.region) LIKE ? OR
-            LOWER(r.subcategory) LIKE ? OR
-            LOWER(r.tags) LIKE ? OR
-            EXISTS (
-              SELECT 1 FROM ingredients i 
-              WHERE i.recipe_id = r.id AND LOWER(i.name) LIKE ?
+        if (isHashtag) {
+          whereClauses.add('(LOWER(r.tags) LIKE ? OR LOWER(r.title) LIKE ?)');
+          final pattern = '%$tagKeyword%';
+          whereArgs.addAll([pattern, pattern]);
+        } else {
+          whereClauses.add('''
+            (
+              LOWER(r.title) LIKE ? OR
+              LOWER(r.description) LIKE ? OR
+              LOWER(r.chef_name) LIKE ? OR
+              LOWER(r.cuisine) LIKE ? OR
+              LOWER(r.region) LIKE ? OR
+              LOWER(r.subcategory) LIKE ? OR
+              LOWER(r.tags) LIKE ? OR
+              EXISTS (
+                SELECT 1 FROM ingredients i 
+                WHERE i.recipe_id = r.id AND LOWER(i.name) LIKE ?
+              )
             )
-          )
-        ''');
-        final pattern = '%$cleanQuery%';
-        whereArgs.addAll([pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern]);
+          ''');
+          final pattern = '%$cleanQuery%';
+          whereArgs.addAll([pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern]);
+        }
       }
 
       if (categoryId != null && categoryId.isNotEmpty && categoryId != 'all') {
@@ -362,6 +371,75 @@ class RecipeLocalDataSourceImpl implements RecipeLocalDataSource {
       });
     } catch (e) {
       throw AppDatabaseException('Failed to delete recipe: $e');
+    }
+  }
+
+  @override
+  Future<void> upsertRecipes(List<RecipeModel> recipes) async {
+    if (recipes.isEmpty) return;
+    try {
+      final db = await databaseService.database;
+      await db.transaction((txn) async {
+        for (final recipe in recipes) {
+          // Check existing local favorite/custom status to preserve it
+          final existing = await txn.query(
+            'recipes',
+            columns: ['is_favorite', 'is_custom'],
+            where: 'id = ?',
+            whereArgs: [recipe.id],
+            limit: 1,
+          );
+
+          int isFav = recipe.isFavorite ? 1 : 0;
+          int isCustom = recipe.isCustom ? 1 : 0;
+
+          if (existing.isNotEmpty) {
+            // Preserve user's local favorite and custom status
+            final localFav = existing.first['is_favorite'];
+            if (localFav != null) {
+              isFav = (localFav as num) == 1 ? 1 : isFav;
+            }
+            final localCustom = existing.first['is_custom'];
+            if (localCustom != null) {
+              isCustom = (localCustom as num) == 1 ? 1 : isCustom;
+            }
+          }
+
+          final recipeMap = recipe.toMap();
+          recipeMap['is_favorite'] = isFav;
+          recipeMap['is_custom'] = isCustom;
+
+          await txn.insert(
+            'recipes',
+            recipeMap,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+
+          // Replace ingredients
+          await txn.delete('ingredients', where: 'recipe_id = ?', whereArgs: [recipe.id]);
+          for (final ing in recipe.ingredients) {
+            final ingModel = IngredientModel(
+              name: ing.name,
+              amount: ing.amount,
+              unit: ing.unit,
+            );
+            await txn.insert('ingredients', ingModel.toMap(recipe.id));
+          }
+
+          // Replace instructions
+          await txn.delete('instructions', where: 'recipe_id = ?', whereArgs: [recipe.id]);
+          for (final inst in recipe.instructions) {
+            final instModel = InstructionStepModel(
+              stepNumber: inst.stepNumber,
+              instruction: inst.instruction,
+              timerSeconds: inst.timerSeconds,
+            );
+            await txn.insert('instructions', instModel.toMap(recipe.id));
+          }
+        }
+      });
+    } catch (e) {
+      throw AppDatabaseException('Failed to batch upsert recipes: $e');
     }
   }
 }

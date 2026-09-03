@@ -106,6 +106,9 @@ class MockRecipeRepository implements RecipeRepository {
   Future<void> deleteRecipe(String recipeId) async {
     _recipes.removeWhere((r) => r.id == recipeId);
   }
+
+  @override
+  Future<List<Recipe>> syncRecipesWithServer() async => _recipes;
 }
 
 void main() {

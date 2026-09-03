@@ -54,8 +54,18 @@ class _MyRecipesScreenState extends ConsumerState<MyRecipesScreen> with SingleTi
           ),
         ],
       ),
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
+      body: RefreshIndicator(
+        color: AppColors.primaryOrange,
+        onRefresh: () async {
+          try {
+            await ref.read(syncRecipesWithServerProvider.future);
+          } catch (_) {}
+          ref.invalidate(customRecipesProvider);
+          ref.invalidate(favoriteRecipesProvider);
+        },
+        child: NestedScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             // Kitchen Hub Header Stats
             SliverToBoxAdapter(
@@ -173,6 +183,67 @@ class _MyRecipesScreenState extends ConsumerState<MyRecipesScreen> with SingleTi
                         ),
                       ],
                     ),
+                    const SizedBox(height: 14),
+
+                    // Community Recipe Submissions Card
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.surface : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.primaryOrange.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryOrange.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.cloud_upload_rounded, color: AppColors.primaryOrange, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Community Recipe Submissions',
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Submit recipes to CookMate & track review status.',
+                                  style: TextStyle(fontSize: 11, color: isDark ? AppColors.textMuted : AppColors.lightTextMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          OutlinedButton(
+                            onPressed: () => context.push('/my-submissions'),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primaryOrange),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryOrange)),
+                          ),
+                          const SizedBox(width: 6),
+                          ElevatedButton(
+                            onPressed: () => context.push('/submit-recipe'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryOrange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Submit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -280,6 +351,7 @@ class _MyRecipesScreenState extends ConsumerState<MyRecipesScreen> with SingleTi
             ),
           ],
         ),
+      ),
       ),
     );
   }

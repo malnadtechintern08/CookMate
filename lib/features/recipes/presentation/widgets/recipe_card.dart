@@ -248,6 +248,35 @@ class RecipeCard extends ConsumerWidget {
                           ),
                         ],
                       ),
+                      if (recipe.tags.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: Row(
+                            children: recipe.tags.take(3).map((raw) {
+                              final clean = raw.trim().toLowerCase().replaceAll('#', '').replaceAll(' ', '_');
+                              if (clean.isEmpty) return const SizedBox.shrink();
+                              return Container(
+                                margin: const EdgeInsets.only(right: 5),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '#$clean',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -330,6 +359,35 @@ class RecipeCard extends ConsumerWidget {
                       color: isDark ? AppColors.textMuted : AppColors.lightTextMuted,
                     ),
                   ),
+                  if (recipe.tags.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Row(
+                        children: recipe.tags.take(2).map((raw) {
+                          final clean = raw.trim().toLowerCase().replaceAll('#', '').replaceAll(' ', '_');
+                          if (clean.isEmpty) return const SizedBox.shrink();
+                          return Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              '#$clean',
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

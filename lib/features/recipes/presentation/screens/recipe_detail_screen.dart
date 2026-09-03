@@ -14,6 +14,7 @@ import '../../../shopping/presentation/providers/shopping_provider.dart';
 import '../../domain/entities/recipe.dart';
 import '../providers/recently_viewed_provider.dart';
 import '../providers/recipe_providers.dart';
+import '../../../tags/presentation/providers/tag_providers.dart';
 import '../widgets/ingredient_list_widget.dart';
 
 class RecipeDetailScreen extends ConsumerStatefulWidget {
@@ -324,6 +325,35 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Chef / Community Contributor Attribution
+                      if (recipe.chefName.isNotEmpty) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.surface : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? AppColors.border : Colors.grey[300]!),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.person_outline_rounded, size: 14, color: AppColors.primaryOrange),
+                              const SizedBox(width: 6),
+                              Text(
+                                recipe.chefName.toLowerCase().contains('community')
+                                    ? recipe.chefName
+                                    : 'Recipe by ${recipe.chefName}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       // Region and Nutrition Tag Row
                       Row(
                         children: [
@@ -530,6 +560,73 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                           ),
                         );
                       }),
+
+                      if (recipe.tags.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            const Icon(Icons.tag_rounded, size: 18, color: AppColors.primary),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Tags & Hashtags',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: recipe.tags.map((rawTag) {
+                            final clean = rawTag.trim().toLowerCase().replaceAll('#', '').replaceAll(' ', '_');
+                            if (clean.isEmpty) return const SizedBox.shrink();
+                            return InkWell(
+                              onTap: () {
+                                ref.read(recentSearchesProvider.notifier).addSearch('#$clean');
+                                context.pushNamed(
+                                  RouteNames.hashtagResults,
+                                  pathParameters: {'tag': clean},
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      '#',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      clean,
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
 
                       const SizedBox(height: 100),
                     ],

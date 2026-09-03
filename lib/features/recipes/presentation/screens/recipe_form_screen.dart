@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/recipe_image.dart';
 import '../../../categories/presentation/providers/category_providers.dart';
 import '../../domain/entities/ingredient.dart';
 import '../../domain/entities/instruction_step.dart';
@@ -28,12 +33,12 @@ class _RecipeFormScreenState extends ConsumerState<RecipeFormScreen> {
   final _descriptionController = TextEditingController();
   final _cuisineController = TextEditingController(text: 'Homemade');
   final _chefController = TextEditingController(text: 'Chef You');
-  final _imageUrlController = TextEditingController(
-    text: 'assets/images/recipes/samosa.jpg',
-  );
   final _prepTimeController = TextEditingController(text: '15');
   final _cookTimeController = TextEditingController(text: '20');
   final _servingsController = TextEditingController(text: '4');
+
+  String? _selectedImagePath;
+  final ImagePicker _picker = ImagePicker();
 
   String _selectedCategoryId = 'cat_quick_snacks';
   RecipeDifficulty _selectedDifficulty = RecipeDifficulty.medium;
@@ -91,7 +96,6 @@ class _RecipeFormScreenState extends ConsumerState<RecipeFormScreen> {
     _descriptionController.dispose();
     _cuisineController.dispose();
     _chefController.dispose();
-    _imageUrlController.dispose();
     _prepTimeController.dispose();
     _cookTimeController.dispose();
     _servingsController.dispose();
@@ -105,6 +109,124 @@ class _RecipeFormScreenState extends ConsumerState<RecipeFormScreen> {
       map['timer']?.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final ext = p.extension(picked.path).isEmpty ? '.jpg' : p.extension(picked.path);
+        final fileName = 'recipe_${DateTime.now().millisecondsSinceEpoch}$ext';
+        final savedFile = await File(picked.path).copy('${appDir.path}/$fileName');
+        setState(() {
+          _selectedImagePath = savedFile.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not access image: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showImageSourceSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.cardBackground : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Add Recipe Photo',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+                ),
+                title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Capture a picture of your dish'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Colors.blue),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Select a photo from your device'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (_selectedImagePath != null)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  ),
+                  title: const Text('Remove Photo', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _selectedImagePath = null;
+                    });
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _saveRecipe() async {
@@ -142,7 +264,9 @@ class _RecipeFormScreenState extends ConsumerState<RecipeFormScreen> {
           : _descriptionController.text.trim(),
       chefName: _chefController.text.trim().isEmpty ? 'Chef' : _chefController.text.trim(),
       cuisine: _cuisineController.text.trim().isEmpty ? 'Homemade' : _cuisineController.text.trim(),
-      imageUrl: _imageUrlController.text.trim(),
+      imageUrl: (_selectedImagePath != null && _selectedImagePath!.isNotEmpty)
+          ? _selectedImagePath!
+          : 'assets/images/recipes/samosa.jpg',
       prepTimeMinutes: int.tryParse(_prepTimeController.text.trim()) ?? 15,
       cookTimeMinutes: int.tryParse(_cookTimeController.text.trim()) ?? 20,
       servings: int.tryParse(_servingsController.text.trim()) ?? 4,
@@ -250,15 +374,8 @@ class _RecipeFormScreenState extends ConsumerState<RecipeFormScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _imageUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Image URL',
-                hintText: 'https://...',
-                prefixIcon: Icon(Icons.image_outlined, size: 20),
-              ),
-            ),
+            const SizedBox(height: 16),
+            _buildPhotoPicker(isDark),
             const SizedBox(height: 24),
 
             // Category & Timing Section
@@ -490,6 +607,149 @@ class _RecipeFormScreenState extends ConsumerState<RecipeFormScreen> {
         fontWeight: FontWeight.w800,
         color: AppColors.primary,
         letterSpacing: 0.8,
+      ),
+    );
+  }
+
+  Widget _buildPhotoPicker(bool isDark) {
+    final hasImage = _selectedImagePath != null && _selectedImagePath!.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surface : const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasImage ? AppColors.primary.withValues(alpha: 0.5) : (isDark ? AppColors.border : const Color(0xFFE0E0E0)),
+          width: hasImage ? 1.5 : 1.0,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasImage) ...[
+            Stack(
+              children: [
+                RecipeImage(
+                  imagePath: _selectedImagePath!,
+                  height: 190,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: InkWell(
+                    onTap: () => setState(() => _selectedImagePath = null),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            InkWell(
+              onTap: _showImageSourceSheet,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add_a_photo_rounded,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Recipe Photo',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Take a picture of your dish or pick from gallery',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppColors.textSecondary : Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardBackground : Colors.white,
+              border: Border(
+                top: BorderSide(
+                  color: isDark ? AppColors.border : const Color(0xFFEBEBEB),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                    label: const Text('Camera'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_rounded, size: 18),
+                    label: const Text('Gallery'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -49,8 +49,16 @@ class _MalnadScreenState extends ConsumerState<MalnadScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        color: AppColors.primaryOrange,
+        onRefresh: () async {
+          try {
+            await ref.read(syncRecipesWithServerProvider.future);
+          } catch (_) {}
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // Hero Heritage Header Sliver App Bar
           SliverAppBar(
             expandedHeight: 200,
@@ -250,6 +258,7 @@ class _MalnadScreenState extends ConsumerState<MalnadScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

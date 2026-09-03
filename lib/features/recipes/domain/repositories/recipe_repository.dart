@@ -17,4 +17,5 @@ abstract class RecipeRepository {
   Future<void> createRecipe(Recipe recipe);
   Future<void> updateRecipe(Recipe recipe);
   Future<void> deleteRecipe(String recipeId);
+  Future<List<Recipe>> syncRecipesWithServer();
 }

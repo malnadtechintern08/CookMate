@@ -23,8 +23,8 @@ $flash = get_flash_message();
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- CookMate Admin Brand CSS -->
-    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/admin.css">
+    <!-- CookMate Admin Brand CSS with cache buster -->
+    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/admin.css?v=<?= file_exists(__DIR__ . '/../assets/css/admin.css') ? filemtime(__DIR__ . '/../assets/css/admin.css') : time() ?>">
 </head>
 <body>
 
@@ -51,6 +51,22 @@ $flash = get_flash_message();
                 <span>All Recipes (200+)</span>
             </a>
 
+            <?php
+            $pendingCount = 0;
+            try {
+                $pendingCount = (int)$pdo->query("SELECT COUNT(*) FROM recipe_submissions WHERE status = 'pending'")->fetchColumn();
+            } catch (Exception $e) {}
+            ?>
+            <a href="<?= BASE_URL ?>/recipe-submissions.php" class="nav-item <?= in_array($currentPage, ['recipe-submissions.php', 'recipe-submission-review.php']) ? 'active' : '' ?>">
+                <i class="fa-solid fa-inbox"></i>
+                <span style="flex: 1;">Recipe Submissions</span>
+                <?php if ($pendingCount > 0): ?>
+                    <span style="background: var(--cm-primary); color: #FFF; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 10px; line-height: 1;">
+                        <?= $pendingCount ?>
+                    </span>
+                <?php endif; ?>
+            </a>
+
             <a href="<?= BASE_URL ?>/recipe-form.php" class="nav-item <?= $currentPage === 'recipe-form.php' ? 'active' : '' ?>">
                 <i class="fa-solid fa-circle-plus"></i>
                 <span>Add New Recipe</span>
@@ -61,7 +77,17 @@ $flash = get_flash_message();
                 <span>Categories</span>
             </a>
 
+            <a href="<?= BASE_URL ?>/hashtags.php" class="nav-item <?= $currentPage === 'hashtags.php' ? 'active' : '' ?>">
+                <i class="fa-solid fa-hashtag"></i>
+                <span>Hashtags</span>
+            </a>
+
             <div class="nav-section-label">Data & Database</div>
+
+            <a href="<?= BASE_URL ?>/db_test.php" class="nav-item <?= $currentPage === 'db_test.php' ? 'active' : '' ?>">
+                <i class="fa-solid fa-stethoscope"></i>
+                <span>DB Diagnostics</span>
+            </a>
 
             <a href="<?= BASE_URL ?>/export.php" class="nav-item <?= $currentPage === 'export.php' ? 'active' : '' ?>">
                 <i class="fa-solid fa-file-export"></i>
@@ -75,14 +101,14 @@ $flash = get_flash_message();
         </nav>
 
         <div class="sidebar-footer">
-            <a href="<?= PHPMYADMIN_URL ?>" target="_blank" class="pma-badge-btn" title="Open cookmate_db in phpMyAdmin">
+            <a href="<?= PHPMYADMIN_URL ?>" target="_blank" class="pma-badge-btn" title="Open <?= htmlspecialchars(DB_NAME) ?> in phpMyAdmin">
                 <span><i class="fa-solid fa-database"></i> phpMyAdmin DB</span>
                 <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 10px;"></i>
             </a>
             
             <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--cm-text-muted); padding: 4px 6px;">
                 <span style="width: 8px; height: 8px; border-radius: 50%; background: #4CAF50; display: inline-block; box-shadow: 0 0 8px #4CAF50;"></span>
-                <span>MySQL: <code>cookmate_db</code></span>
+                <span>MySQL: <code><?= htmlspecialchars(DB_NAME) ?></code></span>
             </div>
         </div>
     </aside>

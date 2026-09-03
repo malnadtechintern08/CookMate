@@ -5,12 +5,22 @@
 require_once __DIR__ . '/config/db.php';
 $pdo = get_db_connection();
 
-$id = trim($_GET['id'] ?? '');
-$isEdit = !empty($id);
+// Determine ID from GET or POST
+$id = trim($_POST['id'] ?? $_GET['id'] ?? '');
+
+// Check whether this recipe exists in database
+$existsInDb = false;
+if (!empty($id)) {
+    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM recipes WHERE id = ?");
+    $checkStmt->execute([$id]);
+    $existsInDb = ((int)$checkStmt->fetchColumn() > 0);
+}
+
+$isEdit = $existsInDb || (!empty($_POST['is_edit']) && $_POST['is_edit'] === '1');
 $pageTitle = $isEdit ? 'Edit Recipe' : 'Create New Recipe';
 
 $recipe = [
-    'id' => 'rec_' . bin2hex(random_bytes(4)),
+    'id' => !empty($id) ? $id : 'rec_' . bin2hex(random_bytes(4)),
     'title' => '',
     'description' => '',
     'chef_name' => 'CookMate Chef',
@@ -34,13 +44,13 @@ $recipe = [
 $ingredients = [];
 $instructions = [];
 
-// If editing, load existing data
-if ($isEdit) {
+// If editing and not handling a POST, load existing data from DB
+if ($isEdit && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $stmt = $pdo->prepare("SELECT * FROM recipes WHERE id = ?");
     $stmt->execute([$id]);
     $existing = $stmt->fetch();
     if (!$existing) {
-        set_flash_message('danger', 'Recipe not found!');
+        set_flash_message('danger', 'Recipe not found in database!');
         header('Location: ' . BASE_URL . '/recipes.php');
         exit;
     }
@@ -57,7 +67,7 @@ if ($isEdit) {
     $instructions = $insStmt->fetchAll();
 }
 
-// If no ingredients, start with 3 empty rows
+// If no ingredients, start with 2 empty rows
 if (empty($ingredients)) {
     $ingredients = [
         ['name' => '', 'amount' => '', 'unit' => '', 'notes' => ''],
@@ -75,9 +85,17 @@ if (empty($instructions)) {
 
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $recipeId = trim($_POST['id'] ?? '');
+    // Priority: $_POST['id'] first, then $_GET['id']
+    $recipeId = trim($_POST['id'] ?? $_GET['id'] ?? '');
+
+    // Check whether the record already exists in the database
+    $existsStmt = $pdo->prepare("SELECT COUNT(*) FROM recipes WHERE id = ?");
+    $existsStmt->execute([$recipeId]);
+    $isUpdate = (!empty($recipeId) && (int)$existsStmt->fetchColumn() > 0);
+
     if (empty($recipeId)) {
         $recipeId = 'rec_' . bin2hex(random_bytes(4));
+        $isUpdate = false;
     }
 
     $title = trim($_POST['title'] ?? 'Untitled Recipe');
@@ -94,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rating = min(5.0, max(1.0, (float)($_POST['rating'] ?? 4.5)));
     $isVeg = isset($_POST['is_vegetarian']) ? 1 : 0;
     $isFav = isset($_POST['is_favorite']) ? 1 : 0;
-    $isCustom = isset($_POST['is_custom']) ? 1 : ($isEdit ? $recipe['is_custom'] : 1);
+    $isCustom = isset($_POST['is_custom']) ? 1 : ($isUpdate ? ($recipe['is_custom'] ?? 1) : 1);
     $tags = trim($_POST['tags'] ?? '');
     $nutrition = trim($_POST['nutrition'] ?? '');
     $imageUrl = trim($_POST['image_url'] ?? '');
@@ -118,8 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
-        if ($isEdit) {
-            // Update recipe
+        if ($isUpdate) {
+            // Update existing recipe in database
             $upSql = "
                 UPDATE recipes SET
                     title = ?, description = ?, chef_name = ?, cuisine = ?, image_url = ?,
@@ -136,8 +154,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $rating, $region, $subcategory, $nutrition,
                 $recipeId
             ]);
+
+            // Verify the update succeeded
+            if ($upStmt->rowCount() === 0) {
+                // If 0 affected rows, double-check that the recipe exists
+                $verifyStmt = $pdo->prepare("SELECT COUNT(*) FROM recipes WHERE id = ?");
+                $verifyStmt->execute([$recipeId]);
+                if ((int)$verifyStmt->fetchColumn() === 0) {
+                    throw new Exception("Recipe with ID '{$recipeId}' not found in database for update.");
+                }
+            }
         } else {
-            // Insert recipe
+            // Insert new recipe into database
             $inSql = "
                 INSERT INTO recipes (
                     id, title, description, chef_name, cuisine, image_url,
@@ -153,6 +181,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $categoryId, $tags, $isFav, $isCustom, $isVeg,
                 $rating, $region, $subcategory, $nutrition
             ]);
+            if ($inStmt->rowCount() === 0) {
+                throw new Exception("Failed to insert recipe into database.");
+            }
         }
 
         // Re-sync ingredients: Delete existing and re-insert
@@ -193,12 +224,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Synchronize relational tags and usage counts
+        require_once __DIR__ . '/includes/tag_functions.php';
+        sync_recipe_tags($pdo, $recipeId, $tags);
+
         $pdo->commit();
         set_flash_message('success', "Recipe \"$title\" saved successfully!");
         header('Location: ' . BASE_URL . '/recipe-view.php?id=' . urlencode($recipeId));
         exit;
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         $errorMsg = 'Error saving recipe: ' . $e->getMessage();
     }
 }
@@ -211,12 +248,13 @@ require_once __DIR__ . '/includes/header.php';
 
 <?php if (!empty($errorMsg)): ?>
     <div class="alert alert-danger">
-        <?= htmlspecialchars($errorMsg) ?>
+        <i class="fa-solid fa-triangle-exclamation"></i> <?= htmlspecialchars($errorMsg) ?>
     </div>
 <?php endif; ?>
 
-<form method="POST" enctype="multipart/form-data" id="recipeForm">
+<form method="POST" action="<?= BASE_URL ?>/recipe-form.php<?= $isEdit ? '?id=' . urlencode($recipe['id']) : '' ?>" enctype="multipart/form-data" id="recipeForm">
     <input type="hidden" name="id" value="<?= htmlspecialchars($recipe['id']) ?>">
+    <input type="hidden" name="is_edit" value="<?= $isEdit ? '1' : '0' ?>">
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <div>
@@ -356,8 +394,53 @@ require_once __DIR__ . '/includes/header.php';
             </div>
 
             <div class="form-group">
-                <label class="form-label">Tags (Comma-separated)</label>
-                <input type="text" name="tags" class="form-control" value="<?= htmlspecialchars($recipe['tags']) ?>" placeholder="e.g. Malnad Special, Heritage, Breakfast, Healthy">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label class="form-label" style="margin: 0; font-weight: 700;">
+                        <i class="fa-solid fa-hashtag" style="color: var(--cm-primary); margin-right: 4px;"></i> Hashtags (Food Discovery)
+                    </label>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="autoSuggestHashtags()" style="font-size: 11px; padding: 4px 10px; border-color: rgba(255, 152, 0, 0.4); color: #FFB74D;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Auto-Suggest Hashtags
+                    </button>
+                </div>
+                
+                <input type="hidden" name="tags" id="hiddenTagsInput" value="<?= htmlspecialchars($recipe['tags']) ?>">
+
+                <!-- Rendered Chip Tags -->
+                <div id="hashtagChipsContainer" class="hashtag-chips-container"></div>
+
+                <!-- Add Tag Input with Live Autocomplete -->
+                <div style="position: relative;">
+                    <div class="hashtag-input-bar">
+                        <span class="hashtag-prefix-pill">#</span>
+                        <input type="text" id="hashtagInput" class="hashtag-native-input" placeholder="Type a hashtag (e.g. rice, spicy, malnad) and press Enter or comma..." autocomplete="off">
+                        <button type="button" class="hashtag-add-btn" onclick="addHashtagFromInput()">
+                            <i class="fa-solid fa-plus"></i> Add
+                        </button>
+                    </div>
+                    <div id="hashtagAutocompleteDropdown" class="hashtag-autocomplete-dropdown" style="display: none;"></div>
+                </div>
+
+                <!-- Auto-suggestion preview bar -->
+                <div id="autoSuggestBar" class="auto-suggest-box" style="display: none;">
+                    <div style="font-size: 12px; color: #FFB74D; font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+                        <span><i class="fa-solid fa-lightbulb"></i> Suggested for this recipe:</span>
+                        <span id="suggestedChipsList"></span>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" style="font-size: 11px; padding: 3px 10px;" onclick="addAllSuggestedHashtags()">
+                        Add All
+                    </button>
+                </div>
+
+                <!-- Quick Popular Hashtag Shortcuts -->
+                <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--cm-text-muted);">
+                    <span style="font-weight: 700; color: var(--cm-primary);"><i class="fa-solid fa-fire"></i> Popular:</span>
+                    <?php
+                    $quickPopular = $pdo->query("SELECT name FROM tags WHERE usage_count > 0 ORDER BY usage_count DESC LIMIT 8")->fetchAll(PDO::FETCH_COLUMN);
+                    foreach ($quickPopular as $qp):
+                    ?>
+                        <a href="javascript:void(0)" class="quick-tag-pill" onclick="addHashtag('<?= htmlspecialchars($qp, ENT_QUOTES) ?>')">+ #<?= htmlspecialchars($qp) ?></a>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -574,6 +657,250 @@ function renumberSteps() {
         b.textContent = (i + 1);
     });
 }
+
+/* ==========================================================================
+   Hashtags Management & Autocomplete
+   ========================================================================== */
+let currentHashtags = [];
+let pendingSuggestions = [];
+
+function normalizeHashtag(raw) {
+    if (!raw) return '';
+    return raw.toString()
+        .toLowerCase()
+        .replace(/^#+/, '')
+        .replace(/#+$/, '')
+        .trim()
+        .replace(/[\s\-]+/g, '_')
+        .replace(/[^a-z0-9_]/g, '')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+function initHashtags() {
+    const hiddenVal = document.getElementById('hiddenTagsInput').value;
+    if (hiddenVal) {
+        hiddenVal.split(',').forEach(t => {
+            const norm = normalizeHashtag(t);
+            if (norm && !currentHashtags.includes(norm)) {
+                currentHashtags.push(norm);
+            }
+        });
+    }
+    renderHashtagChips();
+}
+
+function syncHiddenInput() {
+    document.getElementById('hiddenTagsInput').value = currentHashtags.join(', ');
+}
+
+function renderHashtagChips() {
+    const container = document.getElementById('hashtagChipsContainer');
+    if (!container) return;
+
+    if (currentHashtags.length === 0) {
+        container.innerHTML = '<span class="text-muted small italic">No hashtags added yet. Type below or click auto-suggest.</span>';
+        syncHiddenInput();
+        return;
+    }
+
+    container.innerHTML = currentHashtags.map(tag => `
+        <span class="hashtag-chip" data-tag="${tag}">
+            <span>#${tag}</span>
+            <button type="button" class="chip-remove-btn" onclick="removeHashtag('${tag}')" title="Remove #${tag}">&times;</button>
+        </span>
+    `).join('');
+
+    syncHiddenInput();
+}
+
+function addHashtag(raw) {
+    const norm = normalizeHashtag(raw);
+    if (!norm) return false;
+
+    if (currentHashtags.includes(norm)) {
+        // Flash existing chip
+        const chip = document.querySelector(`.hashtag-chip[data-tag="${norm}"]`);
+        if (chip) {
+            chip.style.transform = 'scale(1.15)';
+            chip.style.borderColor = '#FFFFFF';
+            setTimeout(() => {
+                chip.style.transform = 'none';
+                chip.style.borderColor = '';
+            }, 250);
+        }
+        return false;
+    }
+
+    currentHashtags.push(norm);
+    renderHashtagChips();
+    return true;
+}
+
+function removeHashtag(tag) {
+    currentHashtags = currentHashtags.filter(t => t !== tag);
+    renderHashtagChips();
+}
+
+function addHashtagFromInput() {
+    const input = document.getElementById('hashtagInput');
+    const val = input.value.trim();
+    if (!val) return;
+
+    // Handle comma or space separated entry
+    val.split(/[,]+/).forEach(part => {
+        addHashtag(part);
+    });
+
+    input.value = '';
+    closeAutocomplete();
+}
+
+// Live Autocomplete
+const hashtagInput = document.getElementById('hashtagInput');
+const dropdown = document.getElementById('hashtagAutocompleteDropdown');
+let autocompleteTimer = null;
+
+if (hashtagInput) {
+    hashtagInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            addHashtagFromInput();
+        } else if (e.key === 'Escape') {
+            closeAutocomplete();
+        }
+    });
+
+    hashtagInput.addEventListener('input', function() {
+        const val = normalizeHashtag(this.value);
+        clearTimeout(autocompleteTimer);
+        if (!val || val.length < 1) {
+            closeAutocomplete();
+            return;
+        }
+
+        autocompleteTimer = setTimeout(() => {
+            fetch('<?= BASE_URL ?>/api/tags/search.php?q=' + encodeURIComponent(val) + '&limit=8')
+                .then(r => r.json())
+                .then(res => {
+                    if (res && res.status === 'success' && res.data && res.data.length > 0) {
+                        dropdown.innerHTML = res.data.map(item => `
+                            <div class="hashtag-autocomplete-item" onclick="selectAutocompleteTag('${item.name}')">
+                                <span style="font-weight:700; color:var(--cm-primary);">#${item.name}</span>
+                                <span class="item-count">${item.usage_count} recipes</span>
+                            </div>
+                        `).join('');
+                        dropdown.style.display = 'block';
+                    } else {
+                        dropdown.innerHTML = `
+                            <div class="hashtag-autocomplete-item" onclick="selectAutocompleteTag('${val}')">
+                                <span>Create new: <strong class="text-danger">#${val}</strong></span>
+                                <span class="item-count"><i class="fa-solid fa-plus"></i></span>
+                            </div>
+                        `;
+                        dropdown.style.display = 'block';
+                    }
+                })
+                .catch(() => closeAutocomplete());
+        }, 180);
+    });
+}
+
+function selectAutocompleteTag(tagName) {
+    addHashtag(tagName);
+    if (hashtagInput) hashtagInput.value = '';
+    closeAutocomplete();
+}
+
+function closeAutocomplete() {
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    if (dropdown && !dropdown.contains(e.target) && e.target !== hashtagInput) {
+        closeAutocomplete();
+    }
+});
+
+// Auto-Suggest Hashtags based on Title, Category, and Ingredients
+function autoSuggestHashtags() {
+    const title = (document.querySelector('input[name="title"]')?.value || '').toLowerCase();
+    const categorySelect = document.querySelector('select[name="category_id"]');
+    const categoryText = (categorySelect?.options[categorySelect.selectedIndex]?.text || '').toLowerCase();
+    
+    const ingredients = [];
+    document.querySelectorAll('input[name="ingredient_name[]"]').forEach(inp => {
+        if (inp.value.trim()) ingredients.push(inp.value.trim().toLowerCase());
+    });
+
+    const suggestions = [];
+
+    // Keyword detection
+    const foodKeywords = {
+        'rice': ['rice', 'biryani', 'pulao', 'bath', 'puliyogare', 'chitranna', 'curd_rice', 'jeera'],
+        'chicken': ['chicken', 'koli', 'murgh'],
+        'biryani': ['biryani'],
+        'breakfast': ['dosa', 'idli', 'upma', 'poha', 'puri', 'paratha', 'vada', 'appam', 'breakfast'],
+        'malnad': ['malnad', 'akki', 'kadabu', 'havyaka', 'saaru', 'patrode', 'halasina'],
+        'spicy': ['spicy', 'masala', 'pepper', 'mirchi', 'chilli', 'sukka', 'roast'],
+        'healthy': ['salad', 'soup', 'ragi', 'millet', 'diet', 'sprouts', 'healthy'],
+        'snacks': ['snack', 'bonda', 'bajji', 'samosa', 'pakoda', 'crispy'],
+        'paneer': ['paneer'],
+        'south_indian': ['south indian', 'karnataka', 'dosa', 'idli', 'sambar', 'rasam'],
+        'curry': ['curry', 'gravy', 'kurma', 'sambar', 'saaru', 'dal']
+    };
+
+    const combinedText = title + ' ' + categoryText + ' ' + ingredients.join(' ');
+
+    for (const [tag, triggers] of Object.entries(foodKeywords)) {
+        for (const trig of triggers) {
+            if (combinedText.includes(trig)) {
+                if (!currentHashtags.includes(tag) && !suggestions.includes(tag)) {
+                    suggestions.push(tag);
+                }
+                break;
+            }
+        }
+    }
+
+    const isVeg = document.querySelector('input[name="is_vegetarian"]')?.checked;
+    if (isVeg !== undefined) {
+        const dietTag = isVeg ? 'veg' : 'nonveg';
+        if (!currentHashtags.includes(dietTag) && !suggestions.includes(dietTag)) {
+            suggestions.push(dietTag);
+        }
+    }
+
+    pendingSuggestions = suggestions;
+    const bar = document.getElementById('autoSuggestBar');
+    const list = document.getElementById('suggestedChipsList');
+
+    if (suggestions.length === 0) {
+        list.innerHTML = '<em>No new keywords detected. Type tags manually!</em>';
+        bar.style.display = 'block';
+        return;
+    }
+
+    list.innerHTML = suggestions.map(s => `
+        <button type="button" class="btn btn-outline-warning btn-sm py-0 px-2 me-1 mb-1" style="font-size:11px;" onclick="addSuggestedHashtag('${s}', this)">
+            + #${s}
+        </button>
+    `).join('');
+    bar.style.display = 'block';
+}
+
+function addSuggestedHashtag(tag, btn) {
+    addHashtag(tag);
+    if (btn) btn.remove();
+}
+
+function addAllSuggestedHashtags() {
+    pendingSuggestions.forEach(s => addHashtag(s));
+    document.getElementById('autoSuggestBar').style.display = 'none';
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initHashtags);
 </script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

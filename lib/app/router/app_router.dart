@@ -12,6 +12,7 @@ import '../../features/notes/presentation/screens/note_detail_screen.dart';
 import '../../features/notes/presentation/screens/note_form_screen.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
 import '../../features/recipes/domain/entities/recipe.dart';
+import '../../features/recipes/presentation/screens/hashtag_results_screen.dart';
 import '../../features/recipes/presentation/screens/home_screen.dart';
 import '../../features/recipes/presentation/screens/malnad_screen.dart';
 import '../../features/recipes/presentation/screens/my_recipes_screen.dart';
@@ -21,6 +22,8 @@ import '../../features/recipes/presentation/screens/search_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/shopping/presentation/screens/shopping_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
+import '../../features/submissions/presentation/screens/my_submissions_screen.dart';
+import '../../features/submissions/presentation/screens/submit_recipe_screen.dart';
 import '../../l10n/app_localizations.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -147,6 +150,16 @@ class AppRouter {
 
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.hashtagResults,
+        name: RouteNames.hashtagResults,
+        builder: (context, state) {
+          final tag = state.pathParameters['tag'] ?? '';
+          return HashtagResultsScreen(tag: tag);
+        },
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: RoutePaths.categories,
         name: RouteNames.categories,
         builder: (context, state) => const CategoriesScreen(),
@@ -203,6 +216,24 @@ class AppRouter {
           final note = state.extra as Note?;
           return NoteFormScreen(noteId: id, initialNote: note);
         },
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.submitRecipe,
+        name: RouteNames.submitRecipe,
+        builder: (context, state) {
+          final idParam = state.uri.queryParameters['id'];
+          final id = idParam != null ? int.tryParse(idParam) : null;
+          return SubmitRecipeScreen(editSubmissionId: id);
+        },
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.mySubmissions,
+        name: RouteNames.mySubmissions,
+        builder: (context, state) => const MySubmissionsScreen(),
       ),
     ],
   );

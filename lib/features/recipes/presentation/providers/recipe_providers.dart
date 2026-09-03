@@ -2,21 +2,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/database_service.dart';
 import '../../../categories/presentation/providers/category_providers.dart';
 import '../../data/datasources/recipe_local_datasource.dart';
+import '../../data/datasources/recipe_remote_datasource.dart';
 import '../../data/repositories/recipe_repository_impl.dart';
 import '../../domain/entities/recipe.dart';
 import '../../domain/repositories/recipe_repository.dart';
 import '../../domain/usecases/recipe_usecases.dart';
 
-// Data Source Provider
+// Local Data Source Provider
 final recipeLocalDataSourceProvider = Provider<RecipeLocalDataSource>((ref) {
   final dbService = ref.watch(databaseServiceProvider);
   return RecipeLocalDataSourceImpl(dbService);
 });
 
-// Repository Provider
+// Remote Data Source Provider
+final recipeRemoteDataSourceProvider = Provider<RecipeRemoteDataSource>((ref) {
+  return RecipeRemoteDataSourceImpl();
+});
+
+// Repository Provider (combines local SQLite cache & live remote API)
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
-  final dataSource = ref.watch(recipeLocalDataSourceProvider);
-  return RecipeRepositoryImpl(dataSource);
+  final localDataSource = ref.watch(recipeLocalDataSourceProvider);
+  final remoteDataSource = ref.watch(recipeRemoteDataSourceProvider);
+  return RecipeRepositoryImpl(localDataSource, remoteDataSource);
 });
 
 // Use Cases Providers
@@ -68,6 +75,16 @@ final deleteRecipeUseCaseProvider = Provider<DeleteRecipeUseCase>((ref) {
 final allRecipesProvider = FutureProvider.autoDispose<List<Recipe>>((ref) async {
   final useCase = ref.watch(getAllRecipesUseCaseProvider);
   return await useCase.execute();
+});
+
+// Background / Manual sync with live production server (https://cookmate.free.nf)
+final syncRecipesWithServerProvider = FutureProvider.autoDispose<List<Recipe>>((ref) async {
+  final repository = ref.watch(recipeRepositoryProvider);
+  final updatedRecipes = await repository.syncRecipesWithServer();
+  ref.invalidate(allRecipesProvider);
+  ref.invalidate(quickLaunchRecipesProvider);
+  ref.invalidate(favoriteRecipesProvider);
+  return updatedRecipes;
 });
 
 final quickLaunchRecipesProvider = FutureProvider.autoDispose<List<Recipe>>((ref) async {

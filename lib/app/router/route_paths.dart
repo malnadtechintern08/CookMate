@@ -18,4 +18,7 @@ class RoutePaths {
   static const String noteDetail = '/note/:id';
   static const String noteCreate = '/note-create';
   static const String noteEdit = '/note-edit/:id';
+  static const String hashtagResults = '/hashtag/:tag';
+  static const String submitRecipe = '/submit-recipe';
+  static const String mySubmissions = '/my-submissions';
 }

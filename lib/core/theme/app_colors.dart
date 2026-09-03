@@ -8,21 +8,23 @@ class AppColors {
   static const Color border = Color(0xFF262626);
   static const Color imagePlaceholder = Color(0xFF24201D);
 
-  // Primary & Accent Colors
-  static const Color primary = Color(0xFFFF6B35);      // Primary Orange
-  static const Color primaryOrange = Color(0xFFFF6B35);
-  static const Color secondary = Color(0xFFFF8C42);    // Secondary Orange
-  static const Color secondaryOrange = Color(0xFFFF8C42);
-  static const Color primaryLight = Color(0xFFFF9E68);
-  static const Color primaryDark = Color(0xFFE0531E);
+  // Primary & Accent Colors (Matching #E50915 Logo & App Icon)
+  static const Color primary = Color(0xFFE50915);      // Brand Red / Logo Color
+  static const Color primaryOrange = Color(0xFFE50915); // Backward compatibility
+  static const Color secondary = Color(0xFFFF2E36);    // Secondary Accent
+  static const Color secondaryOrange = Color(0xFFFF2E36); // Backward compatibility
+  static const Color primaryLight = Color(0xFFFF5258);
+  static const Color primaryDark = Color(0xFFB20710);
   
   // Dietary Colors
   static const Color vegGreen = Color(0xFF4CAF50);     // Green for Vegetarian
-  static const Color nonVegRed = Color(0xFFE53935);    // Red for Non-Vegetarian
+  static const Color nonVegRed = Color(0xFFE50915);    // Red for Non-Vegetarian / Logo Red
+  static const Color veg = vegGreen;
+  static const Color nonVeg = nonVegRed;
   static const Color success = Color(0xFF4CAF50);
-  static const Color error = Color(0xFFE53935);
+  static const Color error = Color(0xFFE50915);
   static const Color warning = Color(0xFFFFA000);
-  static const Color heart = Color(0xFFE53935);
+  static const Color heart = Color(0xFFE50915);
   
   // Text Colors
   static const Color textPrimary = Color(0xFFFFFFFF);  // White

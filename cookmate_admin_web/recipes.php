@@ -22,9 +22,20 @@ $where = [];
 $params = [];
 
 if ($search !== '') {
-    $where[] = "(r.title LIKE ? OR r.chef_name LIKE ? OR r.cuisine LIKE ? OR r.tags LIKE ? OR r.description LIKE ?)";
-    $term = "%$search%";
-    $params = array_merge($params, [$term, $term, $term, $term, $term]);
+    if (strpos($search, '#') === 0) {
+        require_once __DIR__ . '/includes/tag_functions.php';
+        $tagNorm = normalize_tag($search);
+        $where[] = "r.id IN (
+            SELECT rt.recipe_id FROM recipe_tags rt 
+            INNER JOIN tags t ON t.id = rt.tag_id 
+            WHERE t.name = ?
+        )";
+        $params[] = $tagNorm;
+    } else {
+        $where[] = "(r.title LIKE ? OR r.chef_name LIKE ? OR r.cuisine LIKE ? OR r.tags LIKE ? OR r.description LIKE ?)";
+        $term = "%$search%";
+        $params = array_merge($params, [$term, $term, $term, $term, $term]);
+    }
 }
 
 if ($categoryFilter !== '') {
@@ -172,7 +183,7 @@ require_once __DIR__ . '/includes/header.php';
                     <?php foreach ($recipes as $r): ?>
                         <?php
                             $thumb = !empty($r['image_url']) ? BASE_URL . '/' . ltrim($r['image_url'], '/') : BASE_URL . '/assets/images/app_icon.png';
-                            $catColor = !empty($r['category_color']) ? str_replace('0xFF', '#', $r['category_color']) : '#FF6B35';
+                            $catColor = !empty($r['category_color']) ? str_replace('0xFF', '#', $r['category_color']) : '#E50914';
                         ?>
                         <tr>
                             <td style="text-align: center;">
