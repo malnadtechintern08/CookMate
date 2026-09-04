@@ -1,8 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart' as http_testing;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cookmate/features/notifications/domain/entities/notification_item.dart';
 import 'package:cookmate/features/notifications/data/models/notification_model.dart';
+import 'package:cookmate/features/notifications/data/datasources/notification_remote_datasource.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('Notification Domain & Model Tests', () {
     test('NotificationType.fromString correctly parses all supported types', () {
       expect(NotificationType.fromString('new_recipe'), NotificationType.newRecipe);
@@ -121,6 +131,36 @@ void main() {
       expect(formatBadge(99), '99');
       expect(formatBadge(100), '99+');
       expect(formatBadge(999), '99+');
+    });
+
+    test('NotificationRemoteDataSourceImpl solves InfinityFree slowAES challenge and fetches notifications', () async {
+      int requestCount = 0;
+      final mockClient = http_testing.MockClient((request) async {
+        requestCount++;
+        // If no test cookie is present, return the InfinityFree slowAES HTML challenge
+        if (!request.headers.containsKey('Cookie') || !request.headers['Cookie']!.contains('__test=')) {
+          return http.Response(
+            '<html><body><script>var a=toNumbers("f655ba9d09a112d4968c63579db590b4"),b=toNumbers("98344c2eee86c3994890592585b49f80"),c=toNumbers("debb3cece83a62e82d7699c0a4191b21");document.cookie="__test="+toHex(slowAES.decrypt(c,2,a,b));</script></body></html>',
+            200,
+            headers: {'content-type': 'text/html'},
+          );
+        }
+
+        // Return valid API JSON
+        return http.Response(
+          '{"success":true,"unread_count":1,"data":[{"id":99,"title":"Test Alert","message":"Test Message","type":"admin_announcement","target_type":"all","related_type":null,"related_id":null,"image":null,"action_label":"Tap to Explore","is_read":false,"read_at":null,"created_at":"2026-09-04 12:00:00"}]}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final dataSource = NotificationRemoteDataSourceImpl(client: mockClient);
+      final notifications = await dataSource.getNotifications();
+
+      expect(notifications.length, 1);
+      expect(notifications.first.id, 99);
+      expect(notifications.first.title, 'Test Alert');
+      expect(requestCount, greaterThanOrEqualTo(2));
     });
   });
 }

@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:convert/convert.dart';
 import 'package:http/http.dart' as http;
+import 'package:pointycastle/export.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../models/notification_model.dart';
@@ -15,7 +18,82 @@ abstract class NotificationRemoteDataSource {
 }
 
 class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
-  static String? _cachedInfinityFreeCookie;
+  final http.Client client;
+  static String? _cachedTestCookie;
+
+  static const String mobileUserAgent =
+      'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
+  static const Duration timeoutDuration = Duration(seconds: 15);
+
+  NotificationRemoteDataSourceImpl({http.Client? client})
+      : client = client ?? http.Client();
+
+  /// Solves the InfinityFree slowAES.decrypt(c, 2, a, b) anti-bot challenge
+  String _solveChallenge(String keyHex, String ivHex, String ctHex) {
+    final key = Uint8List.fromList(hex.decode(keyHex));
+    final iv = Uint8List.fromList(hex.decode(ivHex));
+    final ct = Uint8List.fromList(hex.decode(ctHex));
+
+    final cipher = CBCBlockCipher(AESEngine())
+      ..init(false, ParametersWithIV(KeyParameter(key), iv));
+
+    final out = Uint8List(16);
+    cipher.processBlock(ct, 0, out, 0);
+    return hex.encode(out);
+  }
+
+  /// Ensures InfinityFree anti-bot cookie is active before sending requests
+  Future<String?> _ensureInfinityFreeCookie() async {
+    if (_cachedTestCookie != null && _cachedTestCookie!.isNotEmpty) {
+      return _cachedTestCookie;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedCookie = prefs.getString('__infinityfree_test_cookie');
+      if (savedCookie != null && savedCookie.isNotEmpty) {
+        _cachedTestCookie = savedCookie;
+        return _cachedTestCookie;
+      }
+    } catch (_) {}
+
+    try {
+      final headers = <String, String>{
+        'User-Agent': mobileUserAgent,
+        'Accept': 'application/json, text/html, */*',
+      };
+
+      final probeUri = Uri.parse(AppConstants.apiCategoriesEndpoint);
+      final response = await client.get(probeUri, headers: headers).timeout(timeoutDuration);
+
+      if (response.body.contains('slowAES.decrypt') &&
+          response.body.contains('toNumbers(')) {
+        final reg = RegExp(r'toNumbers\("([a-f0-9]+)"\)');
+        final matches = reg.allMatches(response.body).toList();
+        if (matches.length >= 3) {
+          final a = matches[0].group(1)!;
+          final b = matches[1].group(1)!;
+          final c = matches[2].group(1)!;
+          _cachedTestCookie = _solveChallenge(a, b, c);
+
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('__infinityfree_test_cookie', _cachedTestCookie!);
+          } catch (_) {}
+
+          // Register cookie with OpenResty proxy
+          headers['Cookie'] = '__test=$_cachedTestCookie';
+          await client.get(
+            Uri.parse('${AppConstants.apiCategoriesEndpoint}?i=1'),
+            headers: headers,
+          ).timeout(timeoutDuration);
+        }
+      }
+    } catch (_) {}
+
+    return _cachedTestCookie;
+  }
 
   Future<String> _getOrInitAuthToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -57,26 +135,6 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     return token;
   }
 
-  Future<void> _ensureInfinityFreeCookie() async {
-    if (_cachedCookieValid()) return;
-    try {
-      final res = await http.get(
-        Uri.parse(AppConstants.apiBaseUrl),
-        headers: {
-          'User-Agent': 'CookMate-App/1.0.0 (Android; Mobile)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      ).timeout(const Duration(seconds: 4));
-
-      final rawCookie = res.headers['set-cookie'];
-      if (rawCookie != null && rawCookie.isNotEmpty) {
-        _cachedInfinityFreeCookie = rawCookie.split(';').first.trim();
-      }
-    } catch (_) {}
-  }
-
-  bool _cachedCookieValid() => _cachedInfinityFreeCookie != null && _cachedInfinityFreeCookie!.isNotEmpty;
-
   Future<http.Response> _sendRequest(
     Uri uri, {
     String method = 'GET',
@@ -85,25 +143,85 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   }) async {
     await _ensureInfinityFreeCookie();
 
-    final headers = {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'User-Agent': 'CookMate-App/1.0.0 (Flutter; Mobile)',
-      if (_cachedCookieValid()) 'Cookie': _cachedInfinityFreeCookie!,
-      ...?extraHeaders,
+    final headers = <String, String>{
+      'User-Agent': mobileUserAgent,
+      'Accept': 'application/json, text/html, */*',
     };
 
+    if (body != null) {
+      headers['Content-Type'] = 'application/json; charset=utf-8';
+    }
+
+    if (_cachedTestCookie != null && _cachedTestCookie!.isNotEmpty) {
+      headers['Cookie'] = '__test=$_cachedTestCookie';
+    }
+
+    if (extraHeaders != null) {
+      headers.addAll(extraHeaders);
+    }
+
+    http.Response response;
     switch (method.toUpperCase()) {
       case 'POST':
-        return await http.post(uri, headers: headers, body: body).timeout(const Duration(seconds: 10));
+        response = await client.post(uri, headers: headers, body: body).timeout(timeoutDuration);
+        break;
       case 'PUT':
-        return await http.put(uri, headers: headers, body: body).timeout(const Duration(seconds: 10));
+        response = await client.put(uri, headers: headers, body: body).timeout(timeoutDuration);
+        break;
       case 'DELETE':
-        return await http.delete(uri, headers: headers, body: body).timeout(const Duration(seconds: 10));
+        response = await client.delete(uri, headers: headers, body: body).timeout(timeoutDuration);
+        break;
       case 'GET':
       default:
-        return await http.get(uri, headers: headers).timeout(const Duration(seconds: 10));
+        response = await client.get(uri, headers: headers).timeout(timeoutDuration);
+        break;
     }
+
+    // Handle InfinityFree slowAES challenge if cookie expired or missing
+    if (response.body.contains('slowAES.decrypt') ||
+        (response.body.contains('<script>') && response.body.contains('__test'))) {
+      final keyMatch = RegExp(r'toNumbers\("([a-f0-9]+)"\)').allMatches(response.body).toList();
+      if (keyMatch.length >= 3) {
+        final a = keyMatch[0].group(1)!;
+        final b = keyMatch[1].group(1)!;
+        final c = keyMatch[2].group(1)!;
+        _cachedTestCookie = _solveChallenge(a, b, c);
+
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('__infinityfree_test_cookie', _cachedTestCookie!);
+        } catch (_) {}
+
+        headers['Cookie'] = '__test=$_cachedTestCookie';
+
+        // Register cookie with redirect GET first
+        try {
+          await client.get(
+            Uri.parse('${AppConstants.apiCategoriesEndpoint}?i=1'),
+            headers: {'User-Agent': mobileUserAgent, 'Cookie': '__test=$_cachedTestCookie'},
+          ).timeout(timeoutDuration);
+        } catch (_) {}
+
+        // Retry the original request with the fresh solved cookie
+        switch (method.toUpperCase()) {
+          case 'POST':
+            response = await client.post(uri, headers: headers, body: body).timeout(timeoutDuration);
+            break;
+          case 'PUT':
+            response = await client.put(uri, headers: headers, body: body).timeout(timeoutDuration);
+            break;
+          case 'DELETE':
+            response = await client.delete(uri, headers: headers, body: body).timeout(timeoutDuration);
+            break;
+          case 'GET':
+          default:
+            response = await client.get(uri, headers: headers).timeout(timeoutDuration);
+            break;
+        }
+      }
+    }
+
+    return response;
   }
 
   @override
@@ -127,12 +245,23 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     );
 
     if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
+      final body = response.body.trim();
+      if (!body.startsWith('{') && !body.startsWith('[')) {
+        throw Exception('Server returned invalid content: ${body.length > 60 ? body.substring(0, 60) : body}');
+      }
+      final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic> && decoded['success'] == true) {
         final List list = decoded['data'] ?? [];
         return list.map((item) => NotificationModel.fromJson(item as Map<String, dynamic>)).toList();
       }
     }
+
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+        throw Exception(decoded['message']);
+      }
+    } catch (_) {}
 
     throw Exception('Failed to load notifications: HTTP ${response.statusCode}');
   }
@@ -152,9 +281,12 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic> && decoded['success'] == true) {
-          return (decoded['unread_count'] as num?)?.toInt() ?? 0;
+        final body = response.body.trim();
+        if (body.startsWith('{')) {
+          final decoded = jsonDecode(body);
+          if (decoded is Map<String, dynamic> && decoded['success'] == true) {
+            return (decoded['unread_count'] as num?)?.toInt() ?? 0;
+          }
         }
       }
     } catch (_) {}
@@ -178,8 +310,11 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     );
 
     if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      return decoded is Map<String, dynamic> && decoded['success'] == true;
+      final body = response.body.trim();
+      if (body.startsWith('{')) {
+        final decoded = jsonDecode(body);
+        return decoded is Map<String, dynamic> && decoded['success'] == true;
+      }
     }
 
     return false;
@@ -200,9 +335,12 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     );
 
     if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map<String, dynamic> && decoded['success'] == true) {
-        return (decoded['updated_count'] as num?)?.toInt() ?? 0;
+      final body = response.body.trim();
+      if (body.startsWith('{')) {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic> && decoded['success'] == true) {
+          return (decoded['updated_count'] as num?)?.toInt() ?? 0;
+        }
       }
     }
 
@@ -225,8 +363,11 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     );
 
     if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      return decoded is Map<String, dynamic> && decoded['success'] == true;
+      final body = response.body.trim();
+      if (body.startsWith('{')) {
+        final decoded = jsonDecode(body);
+        return decoded is Map<String, dynamic> && decoded['success'] == true;
+      }
     }
 
     return false;
@@ -248,9 +389,12 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     );
 
     if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map<String, dynamic> && decoded['success'] == true && decoded['data'] != null) {
-        return NotificationModel.fromJson(decoded['data'] as Map<String, dynamic>);
+      final body = response.body.trim();
+      if (body.startsWith('{')) {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic> && decoded['success'] == true && decoded['data'] != null) {
+          return NotificationModel.fromJson(decoded['data'] as Map<String, dynamic>);
+        }
       }
     }
 

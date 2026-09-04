@@ -140,8 +140,13 @@ function get_or_register_user(PDO $pdo, ?string $token, ?string $displayName = n
     $name = !empty($displayName) ? trim($displayName) : 'CookMate Chef';
     $device = !empty($deviceInfo) ? trim($deviceInfo) : 'CookMate Mobile App';
 
-    $stmt = $pdo->prepare("INSERT INTO users (auth_token, display_name, device_info) VALUES (?, ?, ?)");
-    $stmt->execute([$newToken, $name, $device]);
+    try {
+        $stmt = $pdo->prepare("INSERT INTO users (auth_token, display_name, device_info) VALUES (?, ?, ?)");
+        $stmt->execute([$newToken, $name, $device]);
+    } catch (PDOException $e) {
+        $stmt = $pdo->prepare("INSERT INTO users (auth_token, display_name) VALUES (?, ?)");
+        $stmt->execute([$newToken, $name]);
+    }
     $newId = (int)$pdo->lastInsertId();
 
     return [

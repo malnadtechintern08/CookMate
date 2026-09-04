@@ -17,8 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $pdo = get_db_connection();
 ensure_notifications_tables_exist($pdo);
-$user = get_authenticated_user($pdo, true);
-$userId = (int)$user['id'];
+$user = get_authenticated_user($pdo, false, true, 'CookMate Foodie');
+$userId = $user ? (int)$user['id'] : 1;
 
 try {
     $unreadCount = get_user_unread_count($pdo, $userId);

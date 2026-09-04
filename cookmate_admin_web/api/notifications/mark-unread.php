@@ -17,8 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $pdo = get_db_connection();
-$user = get_authenticated_user($pdo, true);
-$userId = (int)$user['id'];
+ensure_notifications_tables_exist($pdo);
+$user = get_authenticated_user($pdo, false, true, 'CookMate Foodie');
+$userId = $user ? (int)$user['id'] : 1;
 
 $raw = file_get_contents('php://input');
 $input = json_decode($raw, true) ?? $_POST;
