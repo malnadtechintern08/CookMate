@@ -16,15 +16,6 @@ function ensure_notifications_tables_exist(PDO $pdo): void {
     if ($alreadyRun) return;
 
     try {
-        // Quick verification: check if notifications table exists
-        $pdo->query("SELECT 1 FROM notifications LIMIT 1");
-        $alreadyRun = true;
-        return;
-    } catch (Exception $e) {
-        // Table doesn't exist, proceed to create
-    }
-
-    try {
         // 1. Ensure users table exists
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS users (
@@ -61,25 +52,49 @@ function ensure_notifications_tables_exist(PDO $pdo): void {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
-        // 3. Ensure user_notifications state table exists
-        $pdo->exec("
-            CREATE TABLE IF NOT EXISTS user_notifications (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                notification_id INT NOT NULL,
-                user_id INT NOT NULL,
-                is_read TINYINT(1) NOT NULL DEFAULT 0,
-                read_at DATETIME NULL,
-                is_dismissed TINYINT(1) NOT NULL DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                UNIQUE KEY uq_notif_user (notification_id, user_id),
-                INDEX idx_un_user (user_id),
-                INDEX idx_un_notification (notification_id),
-                INDEX idx_un_read_status (is_read),
-                INDEX idx_un_read_at (read_at),
-                INDEX idx_un_user_read (user_id, is_read, read_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        ");
+        // Ensure action_label column exists on notifications table
+        try {
+            $notifCols = $pdo->query("SHOW COLUMNS FROM notifications")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('action_label', $notifCols)) {
+                $pdo->exec("ALTER TABLE notifications ADD COLUMN action_label VARCHAR(100) NULL AFTER image");
+            }
+        } catch (Exception $e) {}
+
+        // 3. Inspect user_notifications table schema
+        $needRecreateUn = false;
+        try {
+            $unCols = $pdo->query("SHOW COLUMNS FROM user_notifications")->fetchAll(PDO::FETCH_COLUMN);
+            if (empty($unCols)) {
+                $needRecreateUn = true;
+            } elseif (!in_array('notification_id', $unCols) || !in_array('read_at', $unCols)) {
+                // Table has old schema from previous migrations! Drop legacy and recreate relational table
+                $pdo->exec("DROP TABLE IF EXISTS user_notifications");
+                $needRecreateUn = true;
+            }
+        } catch (Exception $e) {
+            $needRecreateUn = true;
+        }
+
+        if ($needRecreateUn) {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS user_notifications (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    notification_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    is_read TINYINT(1) NOT NULL DEFAULT 0,
+                    read_at DATETIME NULL,
+                    is_dismissed TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_notif_user (notification_id, user_id),
+                    INDEX idx_un_user (user_id),
+                    INDEX idx_un_notification (notification_id),
+                    INDEX idx_un_read_status (is_read),
+                    INDEX idx_un_read_at (read_at),
+                    INDEX idx_un_user_read (user_id, is_read, read_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+        }
 
         // 4. Seed initial default users if none exist
         $userCount = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
