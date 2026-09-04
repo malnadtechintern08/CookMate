@@ -26,11 +26,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     });
   }
 
+  bool _isNavigating = false;
+
   void _showMarkAllReadDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppColors.cardBackground : AppColors.lightSurfaceCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -52,7 +55,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(),
             child: Text(
               'Cancel',
               style: TextStyle(color: isDark ? AppColors.textMuted : AppColors.lightTextMuted),
@@ -60,7 +63,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(ctx);
+              Navigator.of(ctx, rootNavigator: true).pop();
               HapticFeedback.mediumImpact();
               ref.read(notificationsProvider.notifier).markAllAsRead();
               ScaffoldMessenger.of(context).showSnackBar(
@@ -84,6 +87,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   void _onNotificationTap(NotificationModel notif) {
+    if (_isNavigating) return;
+    _isNavigating = true;
+    Future.delayed(const Duration(milliseconds: 650), () {
+      if (mounted) _isNavigating = false;
+    });
+
     HapticFeedback.selectionClick();
     // Mark as read immediately
     ref.read(notificationsProvider.notifier).markAsRead(notif.id);

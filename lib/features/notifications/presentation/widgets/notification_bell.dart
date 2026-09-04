@@ -64,6 +64,23 @@ class _NotificationBellState extends ConsumerState<NotificationBell>
     }
   }
 
+  bool _isNavigating = false;
+
+  void _navigateToNotifications() {
+    if (_isNavigating) return;
+    _isNavigating = true;
+    HapticFeedback.lightImpact();
+    context.pushNamed(RouteNames.notifications).then((_) {
+      if (mounted) {
+        setState(() => _isNavigating = false);
+      }
+    }).catchError((_) {
+      if (mounted) {
+        setState(() => _isNavigating = false);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Listen for unread count changes and shake when count increases
@@ -81,10 +98,7 @@ class _NotificationBellState extends ConsumerState<NotificationBell>
       onTapDown: (_) => setState(() => _tapScale = 0.88),
       onTapUp: (_) => setState(() => _tapScale = 1.0),
       onTapCancel: () => setState(() => _tapScale = 1.0),
-      onTap: () {
-        HapticFeedback.lightImpact();
-        context.pushNamed(RouteNames.notifications);
-      },
+      onTap: _navigateToNotifications,
       child: AnimatedScale(
         scale: _tapScale,
         duration: const Duration(milliseconds: 120),
@@ -94,10 +108,10 @@ class _NotificationBellState extends ConsumerState<NotificationBell>
           height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.cardBackground.withOpacity(0.6) : AppColors.lightSurfaceCard,
+            color: isDark ? AppColors.cardBackground.withValues(alpha: 0.6) : AppColors.lightSurfaceCard,
             shape: BoxShape.circle,
             border: Border.all(
-              color: isDark ? AppColors.border.withOpacity(0.8) : AppColors.lightBorder,
+              color: isDark ? AppColors.border.withValues(alpha: 0.8) : AppColors.lightBorder,
               width: 1,
             ),
           ),
@@ -143,7 +157,7 @@ class _NotificationBellState extends ConsumerState<NotificationBell>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withOpacity(0.5),
+                            color: AppColors.primary.withValues(alpha: 0.5),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),

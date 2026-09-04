@@ -32,6 +32,11 @@ import 'route_names.dart';
 import 'route_paths.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> _shellNavigatorHomeKey = GlobalKey<NavigatorState>(debugLabel: 'shellHome');
+final GlobalKey<NavigatorState> _shellNavigatorExploreKey = GlobalKey<NavigatorState>(debugLabel: 'shellExplore');
+final GlobalKey<NavigatorState> _shellNavigatorFavoritesKey = GlobalKey<NavigatorState>(debugLabel: 'shellFavorites');
+final GlobalKey<NavigatorState> _shellNavigatorShoppingKey = GlobalKey<NavigatorState>(debugLabel: 'shellShopping');
+final GlobalKey<NavigatorState> _shellNavigatorMoreKey = GlobalKey<NavigatorState>(debugLabel: 'shellMore');
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -54,6 +59,7 @@ class AppRouter {
         branches: [
           // Branch 0: 🏠 Home
           StatefulShellBranch(
+            navigatorKey: _shellNavigatorHomeKey,
             routes: [
               GoRoute(
                 path: RoutePaths.home,
@@ -65,6 +71,7 @@ class AppRouter {
 
           // Branch 1: 🔍 Explore
           StatefulShellBranch(
+            navigatorKey: _shellNavigatorExploreKey,
             routes: [
               GoRoute(
                 path: RoutePaths.explore,
@@ -76,6 +83,7 @@ class AppRouter {
 
           // Branch 2: ❤️ Favorites
           StatefulShellBranch(
+            navigatorKey: _shellNavigatorFavoritesKey,
             routes: [
               GoRoute(
                 path: RoutePaths.favorites,
@@ -87,6 +95,7 @@ class AppRouter {
 
           // Branch 3: 🛒 Shopping
           StatefulShellBranch(
+            navigatorKey: _shellNavigatorShoppingKey,
             routes: [
               GoRoute(
                 path: RoutePaths.shopping,
@@ -98,6 +107,7 @@ class AppRouter {
 
           // Branch 4: ⚙️ More / My Kitchen
           StatefulShellBranch(
+            navigatorKey: _shellNavigatorMoreKey,
             routes: [
               GoRoute(
                 path: RoutePaths.myRecipes,
@@ -243,20 +253,28 @@ class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: RoutePaths.notifications,
         name: RouteNames.notifications,
-        builder: (context, state) => const NotificationsScreen(),
+        pageBuilder: (context, state) => MaterialPage<void>(
+          key: ValueKey('notifications_${state.uri}_${identityHashCode(state)}'),
+          name: state.name,
+          child: const NotificationsScreen(),
+        ),
       ),
 
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: RoutePaths.notificationDetails,
         name: RouteNames.notificationDetails,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final idStr = state.pathParameters['id'] ?? '0';
           final id = int.tryParse(idStr) ?? 0;
           final notif = state.extra as NotificationModel?;
-          return NotificationDetailsScreen(
-            notificationId: id,
-            initialNotification: notif,
+          return MaterialPage<void>(
+            key: ValueKey('notif_details_${state.uri}_${identityHashCode(state)}'),
+            name: state.name,
+            child: NotificationDetailsScreen(
+              notificationId: id,
+              initialNotification: notif,
+            ),
           );
         },
       ),
