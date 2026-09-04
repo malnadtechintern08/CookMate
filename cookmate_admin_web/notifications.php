@@ -14,6 +14,7 @@ require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/notification_functions.php';
 
 $pdo = get_db_connection();
+ensure_notifications_tables_exist($pdo);
 $pageTitle = 'App Notifications Hub';
 $currentPage = 'notifications.php';
 

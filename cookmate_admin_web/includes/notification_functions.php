@@ -8,6 +8,109 @@
 require_once __DIR__ . '/../config/db.php';
 
 /**
+ * Automatically ensures notification database tables exist and are properly structured.
+ * Self-healing schema for both local development and live production hosting (InfinityFree).
+ */
+function ensure_notifications_tables_exist(PDO $pdo): void {
+    static $alreadyRun = false;
+    if ($alreadyRun) return;
+
+    try {
+        // Quick verification: check if notifications table exists
+        $pdo->query("SELECT 1 FROM notifications LIMIT 1");
+        $alreadyRun = true;
+        return;
+    } catch (Exception $e) {
+        // Table doesn't exist, proceed to create
+    }
+
+    try {
+        // 1. Ensure users table exists
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                display_name VARCHAR(100) NOT NULL,
+                email VARCHAR(150) NULL,
+                auth_token VARCHAR(255) NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 2. Ensure notifications catalog table exists
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                type VARCHAR(50) NOT NULL DEFAULT 'general',
+                target_type VARCHAR(32) NOT NULL DEFAULT 'all',
+                target_user_id INT NULL,
+                related_type VARCHAR(50) NULL,
+                related_id VARCHAR(100) NULL,
+                image VARCHAR(500) NULL,
+                action_label VARCHAR(100) NULL,
+                status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+                created_by_admin_id INT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                expires_at DATETIME NULL,
+                INDEX idx_notif_status (status),
+                INDEX idx_notif_created_at (created_at),
+                INDEX idx_notif_target (target_type, target_user_id),
+                INDEX idx_notif_related (related_type, related_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 3. Ensure user_notifications state table exists
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS user_notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                notification_id INT NOT NULL,
+                user_id INT NOT NULL,
+                is_read TINYINT(1) NOT NULL DEFAULT 0,
+                read_at DATETIME NULL,
+                is_dismissed TINYINT(1) NOT NULL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_notif_user (notification_id, user_id),
+                INDEX idx_un_user (user_id),
+                INDEX idx_un_notification (notification_id),
+                INDEX idx_un_read_status (is_read),
+                INDEX idx_un_read_at (read_at),
+                INDEX idx_un_user_read (user_id, is_read, read_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 4. Seed initial default users if none exist
+        $userCount = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+        if ($userCount === 0) {
+            $pdo->exec("
+                INSERT INTO users (id, display_name, email, auth_token) VALUES 
+                (1, 'Admin Chef', 'admin@cookmate.app', 'tok_admin_001'),
+                (6, 'Abhishek', 'abhishek@example.com', 'tok_abhishek_6a9a773109227'),
+                (7, 'Priya', 'priya@example.com', 'tok_priya_6a9a773109890')
+            ");
+        }
+
+        // 5. Seed initial notifications if catalog is empty
+        $notifCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications")->fetchColumn();
+        if ($notifCount === 0) {
+            $pdo->exec("
+                INSERT INTO notifications (title, message, type, target_type, related_type, related_id, action_label, status, created_at) VALUES 
+                ('New Recipe Added 🍲', 'Chicken Ghee Roast is now available on CookMate. Explore this authentic coastal delicacy!', 'new_recipe', 'all', 'recipe', 'rec_chicken_ghee_roast', 'View Recipe', 'active', NOW()),
+                ('✨ Recipe Updated', 'Masala Dosa recipe has brand new step-by-step cooking instructions and crispiness tips.', 'recipe_updated', 'all', 'recipe', 'rec_masala_dosa', 'Check Recipe', 'active', NOW()),
+                ('📢 CookMate Community Update', 'Welcome to the CookMate notification center! Stay updated with community recipes and chef tips.', 'admin_announcement', 'all', NULL, NULL, 'Tap to Explore', 'active', NOW()),
+                ('🚀 New Feature: Trending Hashtags', 'Discover authentic regional specialties by tapping trending hashtags like #MalnadSpecial.', 'new_feature', 'all', 'feature', 'hashtags', 'Try Hashtags', 'active', NOW())
+            ");
+        }
+
+        $alreadyRun = true;
+    } catch (Exception $ex) {
+        error_log('ensure_notifications_tables_exist error: ' . $ex->getMessage());
+    }
+}
+
+/**
  * Creates a notification in the main catalog table.
  *
  * @param PDO $pdo
@@ -15,6 +118,7 @@ require_once __DIR__ . '/../config/db.php';
  * @return int The created notification ID
  */
 function create_system_notification(PDO $pdo, array $data): int {
+    ensure_notifications_tables_exist($pdo);
     $stmt = $pdo->prepare("
         INSERT INTO notifications (
             title,
@@ -70,6 +174,7 @@ function create_system_notification(PDO $pdo, array $data): int {
  * @return array
  */
 function get_user_notifications(PDO $pdo, int $userId, int $page = 1, int $limit = 20, ?string $filter = null): array {
+    ensure_notifications_tables_exist($pdo);
     $page = max(1, $page);
     $limit = max(1, min(100, $limit));
     $offset = ($page - 1) * $limit;
@@ -151,6 +256,7 @@ function get_user_notifications(PDO $pdo, int $userId, int $page = 1, int $limit
  * @return int
  */
 function get_user_unread_count(PDO $pdo, int $userId): int {
+    ensure_notifications_tables_exist($pdo);
     $stmt = $pdo->prepare("
         SELECT COUNT(*)
         FROM notifications n

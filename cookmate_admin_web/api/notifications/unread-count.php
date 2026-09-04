@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $pdo = get_db_connection();
+ensure_notifications_tables_exist($pdo);
 $user = get_authenticated_user($pdo, true);
 $userId = (int)$user['id'];
 
