@@ -4,7 +4,9 @@
  */
 require_once __DIR__ . '/../config/db.php';
 
-$currentPage = basename($_SERVER['PHP_SELF']);
+if (!isset($currentPage) || empty($currentPage)) {
+    $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+}
 $flash = get_flash_message();
 ?>
 <!DOCTYPE html>
@@ -82,6 +84,22 @@ $flash = get_flash_message();
                 <span>Hashtags</span>
             </a>
 
+            <?php
+            $activeNotifCount = 0;
+            try {
+                $activeNotifCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE status = 'active'")->fetchColumn();
+            } catch (Exception $e) {}
+            ?>
+            <a href="<?= BASE_URL ?>/notifications.php" class="nav-item <?= in_array($currentPage, ['notifications.php']) ? 'active' : '' ?>">
+                <i class="fa-solid fa-bell"></i>
+                <span style="flex: 1;">Notifications</span>
+                <?php if ($activeNotifCount > 0): ?>
+                    <span style="background: rgba(229, 9, 21, 0.2); color: var(--cm-primary); border: 1px solid var(--cm-primary); font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 10px; line-height: 1;">
+                        <?= $activeNotifCount ?>
+                    </span>
+                <?php endif; ?>
+            </a>
+
             <div class="nav-section-label">Data & Database</div>
 
             <a href="<?= BASE_URL ?>/db_test.php" class="nav-item <?= $currentPage === 'db_test.php' ? 'active' : '' ?>">
@@ -124,6 +142,16 @@ $flash = get_flash_message();
             </div>
 
             <div class="admin-header-actions">
+                <a href="<?= BASE_URL ?>/notifications.php" class="btn btn-secondary btn-sm <?= in_array($currentPage, ['notifications.php', 'notifications']) ? 'active' : '' ?>" title="Manage In-App Notifications">
+                    <i class="fa-solid fa-bell" style="color: #FF5252;"></i>
+                    <span>Notifications</span>
+                    <?php if ($activeNotifCount > 0): ?>
+                        <span style="background: var(--cm-primary); color: #FFF; font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 10px; margin-left: 4px;">
+                            <?= $activeNotifCount ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
+
                 <a href="<?= BASE_URL ?>/recipe-form.php" class="btn btn-primary btn-sm">
                     <i class="fa-solid fa-plus"></i>
                     <span>Add Recipe</span>

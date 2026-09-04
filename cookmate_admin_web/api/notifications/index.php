@@ -1,12 +1,13 @@
 <?php
 /**
  * CookMate API - User Notifications Endpoint
- * GET /api/notifications/index.php
- * POST /api/notifications/index.php (mark read)
+ * GET  /api/notifications/index.php?page=1&limit=20&filter=unread
+ * POST /api/notifications/index.php (Mark read fallback)
  */
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth_middleware.php';
+require_once __DIR__ . '/../../includes/notification_functions.php';
 
 set_cors_headers();
 
@@ -19,52 +20,42 @@ $pdo = get_db_connection();
 $user = get_authenticated_user($pdo, true);
 $userId = (int)$user['id'];
 
-// Handle Mark as Read
+// Handle POST (Mark read compatibility)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+    $raw = file_get_contents('php://input');
+    $input = json_decode($raw, true) ?? $_POST;
     $notifId = (int)($input['notification_id'] ?? $input['id'] ?? 0);
 
     if ($notifId > 0) {
-        $up = $pdo->prepare("UPDATE user_notifications SET is_read = 1 WHERE id = ? AND user_id = ?");
-        $up->execute([$notifId, $userId]);
+        mark_notification_as_read($pdo, $notifId, $userId);
     } else {
-        // Mark all as read
-        $up = $pdo->prepare("UPDATE user_notifications SET is_read = 1 WHERE user_id = ?");
-        $up->execute([$userId]);
+        mark_all_notifications_as_read($pdo, $userId);
     }
 
-    json_response(['success' => true, 'message' => 'Notifications updated.']);
+    $unreadCount = get_user_unread_count($pdo, $userId);
+    json_response([
+        'success'      => true,
+        'message'      => 'Notifications status updated successfully.',
+        'unread_count' => $unreadCount
+    ]);
 }
 
-// GET: Fetch list
+// Handle GET: Fetch notification list with 24-hour read retention rule
 try {
-    $stmt = $pdo->prepare("
-        SELECT id, submission_id, title, message, type, is_read, created_at
-        FROM user_notifications
-        WHERE user_id = ?
-        ORDER BY created_at DESC
-        LIMIT 50
-    ");
-    $stmt->execute([$userId]);
-    $notifications = $stmt->fetchAll();
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
+    $filter = isset($_GET['filter']) ? trim($_GET['filter']) : null;
 
-    $unreadCount = (int)$pdo->query("SELECT COUNT(*) FROM user_notifications WHERE user_id = $userId AND is_read = 0")->fetchColumn();
+    $notifications = get_user_notifications($pdo, $userId, $page, $limit, $filter);
+    $unreadCount = get_user_unread_count($pdo, $userId);
 
     json_response([
-        'success' => true,
+        'success'      => true,
         'unread_count' => $unreadCount,
-        'count' => count($notifications),
-        'data' => array_map(function($n) {
-            return [
-                'id' => (int)$n['id'],
-                'submission_id' => $n['submission_id'] ? (int)$n['submission_id'] : null,
-                'title' => $n['title'],
-                'message' => $n['message'],
-                'type' => $n['type'],
-                'is_read' => (bool)$n['is_read'],
-                'created_at' => $n['created_at'],
-            ];
-        }, $notifications)
+        'count'        => count($notifications),
+        'page'         => $page,
+        'limit'        => $limit,
+        'data'         => $notifications
     ]);
 } catch (Exception $e) {
     json_response([

@@ -77,7 +77,29 @@ function get_db_connection() {
 
     $lastException = null;
 
-    // 1. Attempt connection using primary InfinityFree credentials
+    $isLocal = in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1'])
+            || in_array(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0], ['localhost', '127.0.0.1'])
+            || php_sapi_name() === 'cli';
+
+    // 1. If running locally, try local MySQL ports first for instant response
+    if ($isLocal && !getenv('FORCE_REMOTE_DB')) {
+        // Try local MySQL ports: 3307 (XAMPP Mac) then 3306 (Homebrew/Standard)
+        foreach ([3307, 3306] as $localPort) {
+            foreach (['cookmate_db', DB_NAME] as $dbCandidate) {
+                try {
+                    $localDsn = "mysql:host=127.0.0.1;port={$localPort};dbname={$dbCandidate};charset=utf8mb4";
+                    $pdo = new PDO($localDsn, 'root', '', $options);
+                    $GLOBALS['cm_connected_host'] = "127.0.0.1:{$localPort}";
+                    $GLOBALS['cm_connected_db'] = $dbCandidate;
+                    return $pdo;
+                } catch (PDOException $le) {
+                    // Try next candidate
+                }
+            }
+        }
+    }
+
+    // 2. Attempt connection using primary InfinityFree credentials
     foreach ($hostsToTry as $host) {
         try {
             $dsn = "mysql:host={$host};port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
@@ -90,15 +112,10 @@ function get_db_connection() {
         }
     }
 
-    // 2. Local fallback if external connection is blocked (InfinityFree blocks incoming port 3306 from external IPs)
-    $isLocal = in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1'])
-            || in_array(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0], ['localhost', '127.0.0.1'])
-            || php_sapi_name() === 'cli';
-
-    if ($isLocal) {
-        // Try local MySQL ports: 3307 (XAMPP Mac) then 3306 (Homebrew/Standard)
+    // 3. Fallback local attempt if not already tried
+    if (!$isLocal) {
         foreach ([3307, 3306] as $localPort) {
-            foreach ([DB_NAME, 'cookmate_db'] as $dbCandidate) {
+            foreach (['cookmate_db', DB_NAME] as $dbCandidate) {
                 try {
                     $localDsn = "mysql:host=127.0.0.1;port={$localPort};dbname={$dbCandidate};charset=utf8mb4";
                     $pdo = new PDO($localDsn, 'root', '', $options);
@@ -106,7 +123,7 @@ function get_db_connection() {
                     $GLOBALS['cm_connected_db'] = $dbCandidate;
                     return $pdo;
                 } catch (PDOException $le) {
-                    // Try next candidate
+                    // Continue
                 }
             }
         }

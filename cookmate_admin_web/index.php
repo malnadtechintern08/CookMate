@@ -38,6 +38,14 @@ try {
     $pendingSubmissions = (int)$pdo->query("SELECT COUNT(*) FROM recipe_submissions WHERE status = 'pending'")->fetchColumn();
 } catch (Exception $e) {}
 
+// Query notifications count
+$activeNotifications = 0;
+$totalNotifications = 0;
+try {
+    $activeNotifications = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE status = 'active'")->fetchColumn();
+    $totalNotifications = (int)$pdo->query("SELECT COUNT(*) FROM notifications")->fetchColumn();
+} catch (Exception $e) {}
+
 require_once __DIR__ . '/includes/header.php';
 ?>
 
@@ -109,6 +117,16 @@ require_once __DIR__ . '/includes/header.php';
         <div class="stat-info">
             <span class="stat-label">🌿 Malnad Special</span>
             <span class="stat-value"><?= number_format($totalMalnad) ?></span>
+        </div>
+    </div>
+
+    <div class="stat-card" style="cursor: pointer;" onclick="window.location.href='<?= BASE_URL ?>/notifications.php';">
+        <div class="stat-icon" style="background: rgba(229, 9, 21, 0.15); color: var(--cm-primary);">
+            <i class="fa-solid fa-bell"></i>
+        </div>
+        <div class="stat-info">
+            <span class="stat-label">Active Broadcasts</span>
+            <span class="stat-value"><?= number_format($activeNotifications) ?></span>
         </div>
     </div>
 </div>

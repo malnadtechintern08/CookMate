@@ -229,7 +229,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         sync_recipe_tags($pdo, $recipeId, $tags);
 
         $pdo->commit();
-        set_flash_message('success', "Recipe \"$title\" saved successfully!");
+
+        // Broadcast notification if admin checked the notify users box
+        if (!empty($_POST['notify_users'])) {
+            require_once __DIR__ . '/includes/notification_functions.php';
+            try {
+                if ($isUpdate) {
+                    create_system_notification($pdo, [
+                        'title'               => '✨ Recipe Updated',
+                        'message'             => 'New cooking instructions or details have been added to "' . $title . '".',
+                        'type'                => 'recipe_updated',
+                        'target_type'         => 'all',
+                        'related_type'        => 'recipe',
+                        'related_id'          => $recipeId,
+                        'image'               => !empty($imageUrl) ? $imageUrl : null,
+                        'status'              => 'active',
+                        'created_by_admin_id' => 1
+                    ]);
+                } else {
+                    create_system_notification($pdo, [
+                        'title'               => 'New Recipe Added 🍲',
+                        'message'             => '"' . $title . '" is now available on CookMate. Tap to explore ingredients and steps!',
+                        'type'                => 'new_recipe',
+                        'target_type'         => 'all',
+                        'related_type'        => 'recipe',
+                        'related_id'          => $recipeId,
+                        'image'               => !empty($imageUrl) ? $imageUrl : null,
+                        'status'              => 'active',
+                        'created_by_admin_id' => 1
+                    ]);
+                }
+            } catch (Exception $ne) {
+                // Non-critical, recipe is already saved
+            }
+        }
+
+        set_flash_message('success', "Recipe \"$title\" saved successfully!" . (!empty($_POST['notify_users']) ? " Notification broadcast to users." : ""));
         header('Location: ' . BASE_URL . '/recipe-view.php?id=' . urlencode($recipeId));
         exit;
     } catch (Exception $e) {
@@ -548,6 +583,19 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+    </div>
+
+    <!-- Notification Section -->
+    <div class="card" style="border: 1px solid rgba(229, 9, 21, 0.35); background: rgba(229, 9, 21, 0.04); margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <input type="checkbox" name="notify_users" id="notify_users" value="1" <?= !$isEdit ? 'checked' : '' ?> style="width: 20px; height: 20px; accent-color: var(--cm-primary); cursor: pointer;">
+            <label for="notify_users" style="cursor: pointer; font-size: 15px; font-weight: 700; color: #FFF; margin: 0;">
+                <?= $isEdit ? '✨ Notify CookMate users about this recipe update' : '🍲 Notify CookMate users about this new recipe' ?>
+            </label>
+        </div>
+        <p style="margin: 6px 0 0 32px; font-size: 13px; color: var(--cm-text-secondary); line-height: 1.4;">
+            <?= $isEdit ? 'Sends a notification to all users that this recipe has new instructions, ingredients, or cooking tips.' : 'Broadcasts an automatic arrival notification to the in-app notification center for all CookMate users.' ?>
+        </p>
     </div>
 
     <!-- Bottom Save Action Bar -->

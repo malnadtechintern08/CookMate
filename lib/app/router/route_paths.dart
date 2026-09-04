@@ -21,4 +21,6 @@ class RoutePaths {
   static const String hashtagResults = '/hashtag/:tag';
   static const String submitRecipe = '/submit-recipe';
   static const String mySubmissions = '/my-submissions';
+  static const String notifications = '/notifications';
+  static const String notificationDetails = '/notification/:id';
 }

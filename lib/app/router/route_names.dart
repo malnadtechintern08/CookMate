@@ -21,4 +21,6 @@ class RouteNames {
   static const String hashtagResults = 'hashtag_results';
   static const String submitRecipe = 'submit_recipe';
   static const String mySubmissions = 'my_submissions';
+  static const String notifications = 'notifications';
+  static const String notificationDetails = 'notification_details';
 }

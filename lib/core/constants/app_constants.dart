@@ -40,5 +40,12 @@ class AppConstants {
   static const String apiSubmissionsDetailsEndpoint = '$apiBaseUrl/api/recipe-submissions/details.php';
   static const String apiSubmissionsUpdateEndpoint = '$apiBaseUrl/api/recipe-submissions/update.php';
   static const String apiSubmissionsWithdrawEndpoint = '$apiBaseUrl/api/recipe-submissions/withdraw.php';
+
+  // Notifications APIs
   static const String apiNotificationsEndpoint = '$apiBaseUrl/api/notifications/index.php';
+  static const String apiNotificationsUnreadCountEndpoint = '$apiBaseUrl/api/notifications/unread-count.php';
+  static const String apiNotificationsMarkReadEndpoint = '$apiBaseUrl/api/notifications/mark-read.php';
+  static const String apiNotificationsMarkAllReadEndpoint = '$apiBaseUrl/api/notifications/mark-all-read.php';
+  static const String apiNotificationsMarkUnreadEndpoint = '$apiBaseUrl/api/notifications/mark-unread.php';
+  static const String apiNotificationsDetailsEndpoint = '$apiBaseUrl/api/notifications/details.php';
 }

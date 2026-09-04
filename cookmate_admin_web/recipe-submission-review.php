@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/tag_functions.php';
+require_once __DIR__ . '/includes/notification_functions.php';
 
 $pdo = get_db_connection();
 $pageTitle = 'Review Recipe Submission';
@@ -179,17 +180,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $upSub->execute([$newRecipeId, $submissionId]);
 
-            // 7. Send notification to user
-            $notif = $pdo->prepare("
-                INSERT INTO user_notifications (user_id, submission_id, title, message, type, is_read, created_at)
-                VALUES (?, ?, ?, ?, 'approved', 0, NOW())
-            ");
-            $notif->execute([
-                $sub['user_id'],
-                $submissionId,
-                '🎉 Your recipe was approved & published!',
-                "\"" . $sub['recipe_name'] . "\" is now available publicly on CookMate. Thank you for contributing to the community!"
+            // 7. Send personal notification to recipe owner
+            create_system_notification($pdo, [
+                'title'               => '🎉 Your Recipe Is Live!',
+                'message'             => 'Your recipe "' . $sub['recipe_name'] . '" has been approved and published on CookMate. Tap to view your recipe.',
+                'type'                => 'recipe_approved',
+                'target_type'         => 'specific_user',
+                'target_user_id'      => $sub['user_id'],
+                'related_type'        => 'recipe',
+                'related_id'          => $newRecipeId,
+                'action_label'        => 'View Recipe',
+                'status'              => 'active',
+                'created_by_admin_id' => 1
             ]);
+
+            // Send notification to all other CookMate users (owner is excluded to prevent duplicate)
+            if (!isset($_POST['notify_community']) || !empty($_POST['notify_community'])) {
+                create_system_notification($pdo, [
+                    'title'               => '🍲 New Recipe Added',
+                    'message'             => '"' . $sub['recipe_name'] . '" is now available on CookMate. Tap to explore the recipe.',
+                    'type'                => 'new_recipe',
+                    'target_type'         => 'all_except_user',
+                    'target_user_id'      => $sub['user_id'],
+                    'related_type'        => 'recipe',
+                    'related_id'          => $newRecipeId,
+                    'action_label'        => 'Tap to Explore',
+                    'status'              => 'active',
+                    'created_by_admin_id' => 1
+                ]);
+            }
 
             // 8. Log admin activity
             $log = $pdo->prepare("
@@ -232,15 +251,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $up->execute([$submissionId]);
 
-            $notif = $pdo->prepare("
-                INSERT INTO user_notifications (user_id, submission_id, title, message, type, is_read, created_at)
-                VALUES (?, ?, ?, ?, 'approved', 0, NOW())
-            ");
-            $notif->execute([
-                $sub['user_id'],
-                $submissionId,
-                '✅ Your recipe submission was approved!',
-                "\"" . $sub['recipe_name'] . "\" has been reviewed and approved by the CookMate admin team."
+            create_system_notification($pdo, [
+                'title'               => '✅ Recipe Approved',
+                'message'             => 'Your recipe submission "' . $sub['recipe_name'] . '" was reviewed and approved internally.',
+                'type'                => 'recipe_approved',
+                'target_type'         => 'specific_user',
+                'target_user_id'      => $sub['user_id'],
+                'related_type'        => 'recipe_submission',
+                'related_id'          => $submissionId,
+                'status'              => 'active',
+                'created_by_admin_id' => 1
             ]);
 
             set_flash_message('success', "Recipe #$submissionId approved internally.");
@@ -271,15 +291,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $up->execute([$notes, $submissionId]);
 
-                $notif = $pdo->prepare("
-                    INSERT INTO user_notifications (user_id, submission_id, title, message, type, is_read, created_at)
-                    VALUES (?, ?, ?, ?, 'changes_requested', 0, NOW())
-                ");
-                $notif->execute([
-                    $sub['user_id'],
-                    $submissionId,
-                    'CookMate Admin requested changes to your recipe',
-                    "Admin message: " . $notes
+                create_system_notification($pdo, [
+                    'title'               => '📝 Changes Requested',
+                    'message'             => 'CookMate Admin requested changes to your recipe "' . $sub['recipe_name'] . '". Tap to edit and resubmit: ' . $notes,
+                    'type'                => 'changes_requested',
+                    'target_type'         => 'specific_user',
+                    'target_user_id'      => $sub['user_id'],
+                    'related_type'        => 'recipe_submission',
+                    'related_id'          => $submissionId,
+                    'action_label'        => 'Edit & Resubmit',
+                    'status'              => 'active',
+                    'created_by_admin_id' => 1
                 ]);
 
                 set_flash_message('warning', "Changes requested. User has been notified with your message.");
@@ -314,15 +336,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $up->execute([$reason, $submissionId]);
 
-                $notif = $pdo->prepare("
-                    INSERT INTO user_notifications (user_id, submission_id, title, message, type, is_read, created_at)
-                    VALUES (?, ?, ?, ?, 'rejected', 0, NOW())
-                ");
-                $notif->execute([
-                    $sub['user_id'],
-                    $submissionId,
-                    'Your recipe submission was not approved',
-                    "Reason: " . $reason
+                create_system_notification($pdo, [
+                    'title'               => '❌ Recipe Not Approved',
+                    'message'             => 'Your recipe "' . $sub['recipe_name'] . '" was not approved. Reason: ' . $reason,
+                    'type'                => 'recipe_rejected',
+                    'target_type'         => 'specific_user',
+                    'target_user_id'      => $sub['user_id'],
+                    'related_type'        => 'recipe_submission',
+                    'related_id'          => $submissionId,
+                    'action_label'        => 'View Reason',
+                    'status'              => 'active',
+                    'created_by_admin_id' => 1
                 ]);
 
                 set_flash_message('danger', "Recipe submission #$submissionId rejected.");
@@ -641,13 +665,9 @@ require_once __DIR__ . '/includes/header.php';
 
                 <!-- Action 1: Approve & Publish -->
                 <?php if ($sub['allow_publication']): ?>
-                    <form method="POST" action="<?= BASE_URL ?>/recipe-submission-review.php" onsubmit="return confirm('Publish this recipe to the public CookMate collection? It will become active immediately.');">
-                        <input type="hidden" name="submission_id" value="<?= $sub['id'] ?>">
-                        <input type="hidden" name="action" value="approve_and_publish">
-                        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-bottom: 12px; font-size: 14.5px;">
-                            <i class="fa-solid fa-circle-check"></i> Approve &amp; Publish
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-primary" onclick="openPublishModal()" style="width: 100%; padding: 12px; margin-bottom: 12px; font-size: 14.5px; font-weight: 700;">
+                        <i class="fa-solid fa-circle-check"></i> Approve &amp; Publish
+                    </button>
                 <?php else: ?>
                     <button type="button" class="btn btn-secondary" style="width: 100%; padding: 12px; margin-bottom: 12px; opacity: 0.5; cursor: not-allowed;" title="User has not given permission to publish" disabled>
                         <i class="fa-solid fa-lock"></i> Publish Disabled (No Consent)
@@ -775,7 +795,68 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- Approve & Publish Confirmation Modal -->
+<div id="publishConfirmModal" class="cm-modal-overlay" onclick="handleOverlayClick(event, 'publishConfirmModal')">
+    <div class="cm-modal" style="max-width: 520px;">
+        <form method="POST" action="<?= BASE_URL ?>/recipe-submission-review.php">
+            <input type="hidden" name="submission_id" value="<?= $sub['id'] ?>">
+            <input type="hidden" name="action" value="approve_and_publish">
+            <div class="cm-modal-header" style="border-bottom: 1px solid var(--cm-border);">
+                <h3 class="cm-modal-title" style="color: #4CAF50; font-size: 17px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Publish Recipe?</span>
+                </h3>
+                <button type="button" class="cm-modal-close" onclick="closeModal('publishConfirmModal')">&times;</button>
+            </div>
+            <div class="cm-modal-body" style="padding: 20px;">
+                <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--cm-border); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: var(--cm-text-muted); font-size: 12px; display: block; text-transform: uppercase; font-weight: 700;">Recipe</span>
+                        <strong style="color: #FFF; font-size: 15px;"><?= htmlspecialchars($sub['recipe_name']) ?></strong>
+                    </div>
+                    <div>
+                        <span style="color: var(--cm-text-muted); font-size: 12px; display: block; text-transform: uppercase; font-weight: 700;">Submitted By</span>
+                        <strong style="color: #FFB74D; font-size: 14px;"><?= htmlspecialchars($sub['user_display_name'] ?? 'CookMate User') ?></strong>
+                    </div>
+                </div>
+
+                <div style="font-size: 13px; color: #DDD; margin-bottom: 16px; line-height: 1.6;">
+                    <div style="font-weight: 600; color: #FFF; margin-bottom: 6px;">After publication:</div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                        <i class="fa-solid fa-check" style="color: #4CAF50; font-size: 12px;"></i>
+                        <span>Recipe will become available to all CookMate users in the main catalog.</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                        <i class="fa-solid fa-bell" style="color: #64B5F6; font-size: 12px;"></i>
+                        <span>The recipe owner will receive a personal publication notification.</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-users" style="color: #FFB74D; font-size: 12px;"></i>
+                        <span>Other users will receive a new recipe announcement.</span>
+                    </div>
+                </div>
+
+                <div style="background: rgba(76, 175, 80, 0.08); border: 1px solid rgba(76, 175, 80, 0.3); border-radius: 8px; padding: 12px;">
+                    <label style="display: flex; align-items: center; gap: 10px; margin: 0; cursor: pointer; color: #FFF; font-size: 13.5px; font-weight: 600;">
+                        <input type="checkbox" name="notify_community" value="1" checked style="width: 18px; height: 18px; accent-color: var(--cm-primary); cursor: pointer;">
+                        <span>Notify CookMate users about this new recipe</span>
+                    </label>
+                </div>
+            </div>
+            <div class="cm-modal-footer" style="border-top: 1px solid var(--cm-border); display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('publishConfirmModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm" style="background: #4CAF50; border-color: #4CAF50; color: #FFF; font-weight: 700; padding: 8px 18px;">
+                    <i class="fa-solid fa-circle-check"></i> Approve &amp; Publish
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+function openPublishModal() {
+    document.getElementById('publishConfirmModal').classList.add('active');
+}
 function openChangesModal() {
     document.getElementById('changesModal').classList.add('active');
 }

@@ -24,6 +24,9 @@ import '../../features/shopping/presentation/screens/shopping_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../../features/submissions/presentation/screens/my_submissions_screen.dart';
 import '../../features/submissions/presentation/screens/submit_recipe_screen.dart';
+import '../../features/notifications/data/models/notification_model.dart';
+import '../../features/notifications/presentation/screens/notification_details_screen.dart';
+import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../l10n/app_localizations.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -234,6 +237,28 @@ class AppRouter {
         path: RoutePaths.mySubmissions,
         name: RouteNames.mySubmissions,
         builder: (context, state) => const MySubmissionsScreen(),
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.notifications,
+        name: RouteNames.notifications,
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.notificationDetails,
+        name: RouteNames.notificationDetails,
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final id = int.tryParse(idStr) ?? 0;
+          final notif = state.extra as NotificationModel?;
+          return NotificationDetailsScreen(
+            notificationId: id,
+            initialNotification: notif,
+          );
+        },
       ),
     ],
   );

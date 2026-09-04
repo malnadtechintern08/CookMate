@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/router/route_names.dart';
-import '../../../../core/localization/language_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_loading_indicator.dart';
-import '../../../../core/widgets/language_selector_modal.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../categories/presentation/providers/category_providers.dart';
 import '../../../categories/presentation/widgets/category_card_widget.dart';
@@ -16,6 +14,8 @@ import '../../../tags/presentation/providers/tag_providers.dart';
 import '../widgets/featured_recipe_card.dart';
 import '../widgets/recipe_card.dart';
 import '../widgets/recipe_filter_bottom_sheet.dart';
+import '../../../notifications/presentation/widgets/notification_bell.dart';
+import '../../../notifications/presentation/providers/notification_providers.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -24,17 +24,33 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   String _selectedCategoryKey = 'all';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await ref.read(syncRecipesWithServerProvider.future);
       } catch (_) {}
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh notifications and sync recipes when returning from background (Section 14, 36)
+      ref.read(unreadNotificationCountProvider.notifier).refresh();
+      ref.read(syncRecipesWithServerProvider.future);
+    }
   }
 
   final List<Map<String, dynamic>> _chipDefs = [
@@ -82,7 +98,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final allRecipesAsync = ref.watch(allRecipesProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final filterState = ref.watch(recipeFilterProvider);
-    final currentLang = ref.watch(languageProvider);
     final recentlyViewedAsync = ref.watch(recentlyViewedRecipesProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
@@ -161,35 +176,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         Row(
                           children: [
-                            // Language Selector Pill Button
-                            GestureDetector(
-                              onTap: () => LanguageSelectorModal.show(context),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: isDark ? AppColors.cardBackground : AppColors.lightSurfaceCard,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('🌐', style: TextStyle(fontSize: 14)),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      currentLang.nativeName,
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
                             IconButton(
                               onPressed: () => context.push('/submit-recipe'),
                               icon: const Icon(Icons.post_add_rounded, color: AppColors.primaryOrange),
                               tooltip: 'Submit Recipe for Review',
                             ),
+                            const SizedBox(width: 4),
+                            const NotificationBell(),
                             const SizedBox(width: 4),
                             IconButton(
                               onPressed: () => context.pushNamed(RouteNames.settings),
