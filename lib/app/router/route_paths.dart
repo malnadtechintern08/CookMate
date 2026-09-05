@@ -23,4 +23,10 @@ class RoutePaths {
   static const String mySubmissions = '/my-submissions';
   static const String notifications = '/notifications';
   static const String notificationDetails = '/notification/:id';
+  static const String privacyPolicy = '/privacy-policy';
+  static const String faq = '/faq';
+  static const String contactUs = '/contact-us';
+  static const String helpCenter = '/help-center';
+  static const String safetyGuidelines = '/safety-guidelines';
+  static const String rateUs = '/rate-us';
 }

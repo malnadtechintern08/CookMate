@@ -74,6 +74,12 @@ class MockLocalDataSource implements RecipeLocalDataSource {
   Future<void> deleteRecipe(String recipeId) async {
     localRecipes.removeWhere((r) => r.id == recipeId);
   }
+
+  @override
+  Future<void> syncRemoteRecipes(List<RecipeModel> remoteRecipes) async {
+    final custom = localRecipes.where((r) => r.isCustom).toList();
+    localRecipes = [...custom, ...remoteRecipes];
+  }
 }
 
 void main() {

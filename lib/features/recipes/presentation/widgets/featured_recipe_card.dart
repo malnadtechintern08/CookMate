@@ -203,14 +203,16 @@ class FeaturedRecipeCard extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        'by ${recipe.chefName}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Text(
+                          'by ${recipe.chefName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],

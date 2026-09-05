@@ -7,6 +7,7 @@ import '../../../../core/localization/language_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/language_selector_modal.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../rating/presentation/widgets/rating_popup_dialog.dart';
 import '../providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -286,6 +287,122 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: Text(l10n.resetCatalogDesc),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                   onTap: () => _showResetDialog(context, ref),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Help & Legal Section
+          const Text(
+            'HELP & LEGAL',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primaryOrange,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardBackground : AppColors.lightSurfaceCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? AppColors.border : AppColors.lightBorder,
+              ),
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryOrange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.help_center_outlined, color: AppColors.primaryOrange, size: 20),
+                  ),
+                  title: const Text('Help Center & User Guides', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Step-by-step tutorials & app features'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () => context.pushNamed(RouteNames.helpCenter),
+                ),
+                Divider(height: 1, color: isDark ? AppColors.border : AppColors.lightBorder),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.question_answer_outlined, color: Color(0xFF2196F3), size: 20),
+                  ),
+                  title: const Text('Frequently Asked Questions (FAQ)', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Quick answers to common questions'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () => context.pushNamed(RouteNames.faq),
+                ),
+                Divider(height: 1, color: isDark ? AppColors.border : AppColors.lightBorder),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.headset_mic_outlined, color: AppColors.primary, size: 20),
+                  ),
+                  title: const Text('Contact Us & Support', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Helpline, email, & message desk'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () => context.pushNamed(RouteNames.contactUs),
+                ),
+                Divider(height: 1, color: isDark ? AppColors.border : AppColors.lightBorder),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.health_and_safety_outlined, color: Colors.amber, size: 20),
+                  ),
+                  title: const Text('Safety and Guidelines', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Food hygiene, allergens & community standards'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () => context.pushNamed(RouteNames.safetyGuidelines),
+                ),
+                Divider(height: 1, color: isDark ? AppColors.border : AppColors.lightBorder),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.vegGreen.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.privacy_tip_outlined, color: AppColors.vegGreen, size: 20),
+                  ),
+                  title: const Text('Privacy Policy', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Data protection & offline privacy terms'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () => context.pushNamed(RouteNames.privacyPolicy),
+                ),
+                Divider(height: 1, color: isDark ? AppColors.border : AppColors.lightBorder),
+                ListTile(
+                  key: const Key('rate_cookmate_settings_tile'),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.star_rounded, color: Color(0xFFFFB300), size: 20),
+                  ),
+                  title: const Text('⭐ Rate CookMate', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Share your love & review on Google Play'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () => showCookMateRatingPopup(context, isManual: true),
                 ),
               ],
             ),

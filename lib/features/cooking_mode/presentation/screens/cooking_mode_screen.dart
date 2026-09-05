@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/localization/recipe_translations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../rating/presentation/widgets/rating_popup_dialog.dart';
+import '../../../rating/services/rating_service.dart';
 import '../../../recipes/domain/entities/recipe.dart';
 import '../providers/cooking_session_provider.dart';
 import '../widgets/cooking_timer_widget.dart';
@@ -198,9 +200,20 @@ class CookingModeScreen extends ConsumerWidget {
                   ],
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
+                        final isFinishing = currentStepNum == totalSteps;
                         sessionNotifier.toggleStepCompletion(sessionState.currentStepIndex);
                         sessionNotifier.nextStep();
+                        if (isFinishing) {
+                          await RatingService.instance.recordMeaningfulAction();
+                          if (context.mounted) {
+                            Future.delayed(const Duration(milliseconds: 600), () {
+                              if (context.mounted) {
+                                showCookMateRatingPopup(context, isManual: false);
+                              }
+                            });
+                          }
+                        }
                       },
                       icon: Icon(
                         currentStepNum == totalSteps ? Icons.celebration_rounded : Icons.arrow_forward_rounded,
@@ -224,8 +237,8 @@ class CookingModeScreen extends ConsumerWidget {
   Widget _buildCelebrationScreen(BuildContext context, bool isDark, AppLocalizations l10n) {
     return Scaffold(
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

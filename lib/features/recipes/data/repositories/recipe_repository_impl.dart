@@ -66,7 +66,7 @@ class RecipeRepositoryImpl implements RecipeRepository {
       try {
         final remote = await remoteDataSource!.fetchRecipes(limit: 500);
         if (remote.isNotEmpty) {
-          await localDataSource.upsertRecipes(remote);
+          await localDataSource.syncRemoteRecipes(remote);
         }
       } catch (_) {
         // If offline or server error, retain local data

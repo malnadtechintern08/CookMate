@@ -48,16 +48,28 @@ $flash = get_flash_message();
                 <span>Dashboard</span>
             </a>
 
+            <?php
+            $totalRecipeCount = 0;
+            try {
+                if (!isset($pdo) || !$pdo) {
+                    $pdo = get_db_connection();
+                }
+                $totalRecipeCount = (int)$pdo->query("SELECT COUNT(*) FROM recipes")->fetchColumn();
+            } catch (Throwable $e) {}
+            ?>
             <a href="<?= BASE_URL ?>/recipes.php" class="nav-item <?= in_array($currentPage, ['recipes.php', 'recipe-view.php']) ? 'active' : '' ?>">
                 <i class="fa-solid fa-utensils"></i>
-                <span>All Recipes (200+)</span>
+                <span>All Recipes (<?= $totalRecipeCount ?>)</span>
             </a>
 
             <?php
             $pendingCount = 0;
             try {
+                if (!isset($pdo) || !$pdo) {
+                    $pdo = get_db_connection();
+                }
                 $pendingCount = (int)$pdo->query("SELECT COUNT(*) FROM recipe_submissions WHERE status = 'pending'")->fetchColumn();
-            } catch (Exception $e) {}
+            } catch (Throwable $e) {}
             ?>
             <a href="<?= BASE_URL ?>/recipe-submissions.php" class="nav-item <?= in_array($currentPage, ['recipe-submissions.php', 'recipe-submission-review.php']) ? 'active' : '' ?>">
                 <i class="fa-solid fa-inbox"></i>
@@ -96,6 +108,50 @@ $flash = get_flash_message();
                 <?php if ($activeNotifCount > 0): ?>
                     <span style="background: rgba(229, 9, 21, 0.2); color: var(--cm-primary); border: 1px solid var(--cm-primary); font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 10px; line-height: 1;">
                         <?= $activeNotifCount ?>
+                    </span>
+                <?php endif; ?>
+            </a>
+
+            <div class="nav-section-label">Legal & Support</div>
+
+            <a href="<?= BASE_URL ?>/support_pages.php" class="nav-item <?= in_array($currentPage, ['support_pages.php', 'support_page_edit.php']) ? 'active' : '' ?>">
+                <i class="fa-solid fa-file-shield"></i>
+                <span>Policy & Pages</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>/faqs.php" class="nav-item <?= in_array($currentPage, ['faqs.php']) ? 'active' : '' ?>">
+                <i class="fa-solid fa-circle-question"></i>
+                <span>FAQ Manager</span>
+            </a>
+
+            <?php
+            $newInquiriesCount = 0;
+            try {
+                $newInquiriesCount = (int)$pdo->query("SELECT COUNT(*) FROM contact_inquiries WHERE status = 'new'")->fetchColumn();
+            } catch (Exception $e) {}
+            ?>
+            <a href="<?= BASE_URL ?>/contact_inquiries.php" class="nav-item <?= in_array($currentPage, ['contact_inquiries.php']) ? 'active' : '' ?>">
+                <i class="fa-solid fa-envelope-open-text"></i>
+                <span style="flex: 1;">Contact Inquiries</span>
+                <?php if ($newInquiriesCount > 0): ?>
+                    <span style="background: rgba(255, 160, 0, 0.2); color: #FFA000; border: 1px solid #FFA000; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 10px; line-height: 1;">
+                        <?= $newInquiriesCount ?>
+                    </span>
+                <?php endif; ?>
+            </a>
+
+            <?php
+            $newRatingsCount = 0;
+            try {
+                $newRatingsCount = (int)$pdo->query("SELECT COUNT(*) FROM app_ratings WHERE status = 'new'")->fetchColumn();
+            } catch (Throwable $e) {}
+            ?>
+            <a href="<?= BASE_URL ?>/rateus.php" class="nav-item <?= in_array($currentPage, ['rateus.php']) ? 'active' : '' ?>">
+                <i class="fa-solid fa-star-half-stroke"></i>
+                <span style="flex: 1;">Rate Us Reviews</span>
+                <?php if ($newRatingsCount > 0): ?>
+                    <span style="background: rgba(255, 179, 0, 0.2); color: #FFB300; border: 1px solid #FFB300; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 10px; line-height: 1;">
+                        <?= $newRatingsCount ?>
                     </span>
                 <?php endif; ?>
             </a>

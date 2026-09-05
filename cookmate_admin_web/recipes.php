@@ -1,6 +1,6 @@
 <?php
 /**
- * CookMate Web Admin - Recipe Catalog (200+ Recipes)
+ * CookMate Web Admin - Recipe Catalog
  */
 require_once __DIR__ . '/config/db.php';
 $pdo = get_db_connection();

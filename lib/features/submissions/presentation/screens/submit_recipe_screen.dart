@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../app/router/route_paths.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../categories/presentation/providers/category_providers.dart';
+import '../../../rating/services/rating_service.dart';
 import '../providers/submission_providers.dart';
 
 class SubmitRecipeScreen extends ConsumerStatefulWidget {
@@ -206,7 +208,7 @@ class _SubmitRecipeScreenState extends ConsumerState<SubmitRecipeScreen> {
       backgroundColor: isDark ? AppColors.cardBackground : Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -345,6 +347,12 @@ class _SubmitRecipeScreenState extends ConsumerState<SubmitRecipeScreen> {
         setState(() => _isSubmitting = false);
         if (success) {
           _showSuccessDialog();
+          // Trigger 1: Show rating popup after a short 1.5s delay following success message
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (mounted) {
+              RatingService.instance.triggerPostUploadRating(context);
+            }
+          });
         } else {
           final err = ref.read(submissionControllerProvider).error;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -370,73 +378,83 @@ class _SubmitRecipeScreenState extends ConsumerState<SubmitRecipeScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppColors.cardBackground : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.schedule_send_rounded, color: Colors.amber, size: 36),
               ),
-              child: const Icon(Icons.schedule_send_rounded, color: Colors.amber, size: 36),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Recipe Submitted Successfully',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Your recipe "${_nameController.text.trim()}" has been sent to the CookMate team for review.',
-              style: TextStyle(fontSize: 13.5, color: isDark ? Colors.white70 : AppColors.lightTextSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+              const SizedBox(height: 16),
+              const Text(
+                'Recipe submitted successfully! 🎉',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                textAlign: TextAlign.center,
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.hourglass_top_rounded, color: Colors.amber, size: 16),
-                  SizedBox(width: 8),
-                  Text(
-                    'Current Status: Pending Review',
-                    style: TextStyle(color: Colors.amber, fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ],
+              const SizedBox(height: 10),
+              Text(
+                'Your recipe "${_nameController.text.trim()}" has been sent to the CookMate team for review.',
+                style: TextStyle(fontSize: 13.5, color: isDark ? Colors.white70 : AppColors.lightTextSecondary),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                context.go('/my-submissions');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                minimumSize: const Size(double.infinity, 44),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.hourglass_top_rounded, color: Colors.amber, size: 16),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Current Status: Pending Review',
+                        style: TextStyle(color: Colors.amber, fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: const Text('View My Submissions', style: TextStyle(fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                context.go('/');
-              },
-              child: const Text('Return to Home', style: TextStyle(color: AppColors.textMuted)),
-            ),
-          ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  if (mounted) {
+                    context.go(RoutePaths.mySubmissions);
+                    RatingService.instance.triggerBackNavigationRating();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  minimumSize: const Size(double.infinity, 44),
+                ),
+                child: const Text('View My Submissions', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  if (mounted) {
+                    context.go(RoutePaths.home);
+                    RatingService.instance.triggerBackNavigationRating();
+                  }
+                },
+                child: const Text('Return to Home', style: TextStyle(color: AppColors.textMuted)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -472,8 +490,15 @@ class _SubmitRecipeScreenState extends ConsumerState<SubmitRecipeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final categoriesAsync = ref.watch(categoriesProvider);
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          RatingService.instance.triggerBackNavigationRating();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
           widget.editSubmissionId != null ? 'Edit Recipe Submission' : 'Submit Recipe for Review',
@@ -939,6 +964,7 @@ class _SubmitRecipeScreenState extends ConsumerState<SubmitRecipeScreen> {
             const SizedBox(height: 36),
           ],
         ),
+      ),
       ),
     );
   }

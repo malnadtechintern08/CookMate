@@ -34,21 +34,26 @@ class _RecipeFilterBottomSheetState extends ConsumerState<RecipeFilterBottomShee
     final l10n = AppLocalizations.of(context)!;
     final langCode = Localizations.localeOf(context).languageCode;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurfaceCard : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        top: 20,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurfaceCard : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.only(
+          top: 20,
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           // Header Drag Handle & Title
           Center(
             child: Container(
@@ -64,11 +69,15 @@ class _RecipeFilterBottomSheetState extends ConsumerState<RecipeFilterBottomShee
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                l10n.filterRecipes,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+              Expanded(
+                child: Text(
+                  l10n.filterRecipes,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ) ?? const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                ),
               ),
               TextButton(
                 onPressed: () {
@@ -166,6 +175,8 @@ class _RecipeFilterBottomSheetState extends ConsumerState<RecipeFilterBottomShee
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

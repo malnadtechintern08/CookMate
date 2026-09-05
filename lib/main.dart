@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'core/database/database_service.dart';
 import 'core/services/preference_service.dart';
+import 'features/notifications/services/cookmate_notification_service.dart';
+import 'features/notifications/services/notification_sync_service.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
 
 void main() async {
@@ -11,6 +13,14 @@ void main() async {
   // Initialize offline services
   final prefService = await PreferenceService.init();
   await DatabaseService.instance.database;
+
+  // Initialize CookMate Heads-Up notifications and background sync
+  try {
+    await CookMateNotificationService.instance.init();
+    await NotificationSyncService.instance.start();
+  } catch (e) {
+    debugPrint('Notification service initialization error: $e');
+  }
 
   runApp(
     ProviderScope(

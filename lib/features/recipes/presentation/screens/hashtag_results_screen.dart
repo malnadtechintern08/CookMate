@@ -134,33 +134,39 @@ class _HashtagResultsScreenState extends ConsumerState<HashtagResultsScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '#',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '#',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _normalizedTag,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : AppColors.lightTextPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
+                    Flexible(
+                      child: Text(
+                        _normalizedTag,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 8),

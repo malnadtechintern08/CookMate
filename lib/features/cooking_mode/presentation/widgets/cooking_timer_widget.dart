@@ -47,24 +47,31 @@ class CookingTimerWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.timer_rounded,
-                    size: 20,
-                    color: isCompleted ? AppColors.success : AppColors.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isCompleted ? 'STEP TIMER FINISHED' : 'STEP TIMER',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.timer_rounded,
+                      size: 20,
                       color: isCompleted ? AppColors.success : AppColors.primary,
-                      letterSpacing: 0.5,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        isCompleted ? 'STEP TIMER FINISHED' : 'STEP TIMER',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: isCompleted ? AppColors.success : AppColors.primary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               if (isRunning)
                 Container(

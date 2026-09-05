@@ -50,8 +50,8 @@ class DatabaseService {
         version: AppConstants.dbVersion,
         onCreate: _onCreate,
         onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 4) {
-            // Drop and re-create for clean migration with preserved architecture
+          if (oldVersion < 5) {
+            // Drop and re-create catalog tables for clean synchronization with 50-recipe catalog
             await db.execute('DROP TABLE IF EXISTS instructions');
             await db.execute('DROP TABLE IF EXISTS ingredients');
             await db.execute('DROP TABLE IF EXISTS recipes');

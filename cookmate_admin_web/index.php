@@ -183,7 +183,7 @@ require_once __DIR__ . '/includes/header.php';
     <div class="card-header">
         <h2 class="card-title">Recent Recipes</h2>
         <div style="display: flex; gap: 10px;">
-            <a href="<?= BASE_URL ?>/recipes.php" class="btn btn-secondary btn-sm">View All 200+ Recipes</a>
+            <a href="<?= BASE_URL ?>/recipes.php" class="btn btn-secondary btn-sm">View All Recipes (<?= $totalRecipes ?>)</a>
             <a href="<?= BASE_URL ?>/recipe-form.php" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Add Recipe</a>
         </div>
     </div>

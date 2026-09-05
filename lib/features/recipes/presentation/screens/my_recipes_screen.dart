@@ -287,11 +287,11 @@ class _MyRecipesScreenState extends ConsumerState<MyRecipesScreen> with SingleTi
 
                 return GridView.builder(
                   padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 14,
                     mainAxisSpacing: 14,
-                    childAspectRatio: 0.78,
+                    childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.70 : 0.76,
                   ),
                   itemCount: recipes.length,
                   itemBuilder: (context, index) {
@@ -325,11 +325,11 @@ class _MyRecipesScreenState extends ConsumerState<MyRecipesScreen> with SingleTi
 
                 return GridView.builder(
                   padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 14,
                     mainAxisSpacing: 14,
-                    childAspectRatio: 0.78,
+                    childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.70 : 0.76,
                   ),
                   itemCount: recent.length,
                   itemBuilder: (context, index) {

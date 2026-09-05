@@ -198,31 +198,88 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                 );
               }
 
-              return SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                    childAspectRatio: 0.78,
+              return SliverMainAxisGroup(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryOrange.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.restaurant_menu_rounded,
+                                  size: 13,
+                                  color: AppColors.primaryOrange,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '${recipes.length} Recipes',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primaryOrange,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _selectedTagKey == 'all'
+                                  ? 'Showing all ${recipes.length} recipes'
+                                  : 'Showing ${filtered.length} of ${recipes.length} recipes',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final recipe = filtered[index];
-                      return RecipeCard(
-                        recipe: recipe,
-                        onTap: () {
-                          context.pushNamed(
-                            RouteNames.recipeDetail,
-                            pathParameters: {'id': recipe.id},
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 14,
+                        crossAxisSpacing: 14,
+                        childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.70 : 0.76,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final recipe = filtered[index];
+                          return RecipeCard(
+                            recipe: recipe,
+                            onTap: () {
+                              context.pushNamed(
+                                RouteNames.recipeDetail,
+                                pathParameters: {'id': recipe.id},
+                              );
+                            },
                           );
                         },
-                      );
-                    },
-                    childCount: filtered.length,
+                        childCount: filtered.length,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               );
             },
             loading: () => const SliverFillRemaining(

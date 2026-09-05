@@ -4,13 +4,13 @@ import 'package:cookmate/features/shopping/domain/entities/shopping_item.dart';
 import 'package:cookmate/features/recipes/domain/entities/recipe.dart';
 
 void main() {
-  group('CookMate 200 Recipes & Malnad Special Tests', () {
-    test('SeedData contains exactly 200 recipes with unique IDs', () {
+  group('CookMate 50 Recipes & Malnad Special Tests', () {
+    test('SeedData contains exactly 50 recipes with unique IDs', () {
       final recipes = SeedData.recipes;
-      expect(recipes.length, equals(200));
+      expect(recipes.length, equals(50));
 
       final ids = recipes.map((r) => r['id'] as String).toSet();
-      expect(ids.length, equals(200), reason: 'All recipe IDs must be unique');
+      expect(ids.length, equals(50), reason: 'All recipe IDs must be unique');
     });
 
     test('SeedData contains 50 authentic Malnad Special recipes', () {

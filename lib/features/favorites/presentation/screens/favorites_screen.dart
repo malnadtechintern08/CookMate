@@ -51,11 +51,11 @@ class FavoritesScreen extends ConsumerWidget {
             return GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 14,
                 mainAxisSpacing: 14,
-                childAspectRatio: 0.78,
+                childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.70 : 0.76,
               ),
               itemCount: favorites.length,
               itemBuilder: (context, index) {

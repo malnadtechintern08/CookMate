@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/router/route_names.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_error_state.dart';
 import '../../../../core/widgets/app_loading_indicator.dart';
@@ -29,27 +30,72 @@ class CategoriesScreen extends ConsumerWidget {
             );
           }
 
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
-              childAspectRatio: 1.05,
-            ),
-            itemCount: categories.length,
-            itemBuilder: (context, index) {
-              final category = categories[index];
-              return CategoryCardWidget(
-                category: category,
-                onTap: () {
-                  context.pushNamed(
-                    RouteNames.categoryRecipes,
-                    pathParameters: {'id': category.id},
-                  );
-                },
-              );
-            },
+          final totalRecipes = categories.fold<int>(0, (sum, cat) => sum + cat.recipeCount);
+
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.primaryOrange.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.restaurant_menu_rounded,
+                          color: AppColors.primaryOrange,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '$totalRecipes Recipes across ${categories.length} Categories',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: AppColors.primaryOrange,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.94 : 1.05,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final category = categories[index];
+                      return CategoryCardWidget(
+                        category: category,
+                        onTap: () {
+                          context.pushNamed(
+                            RouteNames.categoryRecipes,
+                            pathParameters: {'id': category.id},
+                          );
+                        },
+                      );
+                    },
+                    childCount: categories.length,
+                  ),
+                ),
+              ),
+            ],
           );
         },
         loading: () => const AppLoadingIndicator(message: 'Loading categories...'),

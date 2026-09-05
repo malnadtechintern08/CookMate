@@ -16,6 +16,7 @@ import '../widgets/recipe_card.dart';
 import '../widgets/recipe_filter_bottom_sheet.dart';
 import '../../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../notifications/presentation/providers/notification_providers.dart';
+import '../../../rating/presentation/widgets/rating_popup_dialog.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +36,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       try {
         await ref.read(syncRecipesWithServerProvider.future);
       } catch (_) {}
+      if (mounted) {
+        showCookMateRatingPopup(context, isManual: false);
+      }
     });
   }
 
@@ -129,64 +133,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.asset(
-                                'assets/images/app_icon.png',
-                                width: 34,
-                                height: 34,
-                                fit: BoxFit.cover,
-                                errorBuilder: (ctx, err, stack) => const Icon(
-                                  Icons.restaurant_menu_rounded,
-                                  color: AppColors.primaryOrange,
-                                  size: 28,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.asset(
+                                  'assets/images/app_icon.png',
+                                  width: 32,
+                                  height: 32,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (ctx, err, stack) => const Icon(
+                                    Icons.restaurant_menu_rounded,
+                                    color: AppColors.primaryOrange,
+                                    size: 26,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                RichText(
-                                  text: TextSpan(
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -0.3,
-                                      color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    RichText(
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      text: TextSpan(
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: -0.3,
+                                          color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                                        ),
+                                        children: [
+                                          TextSpan(text: 'Cook', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w900)),
+                                          const TextSpan(text: 'Mate', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900)),
+                                        ],
+                                      ),
                                     ),
-                                    children: [
-                                      TextSpan(text: 'Cook', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w900)),
-                                      const TextSpan(text: 'Mate', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900)),
-                                    ],
-                                  ),
+                                    Text(
+                                      l10n.whatsCookingToday,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  l10n.whatsCookingToday,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
                               onPressed: () => context.push('/submit-recipe'),
-                              icon: const Icon(Icons.post_add_rounded, color: AppColors.primaryOrange),
+                              icon: const Icon(Icons.post_add_rounded, color: AppColors.primaryOrange, size: 22),
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                               tooltip: 'Submit Recipe for Review',
                             ),
-                            const SizedBox(width: 4),
                             const NotificationBell(),
-                            const SizedBox(width: 4),
                             IconButton(
                               onPressed: () => context.pushNamed(RouteNames.settings),
-                              icon: const Icon(Icons.settings_outlined),
+                              icon: const Icon(Icons.settings_outlined, size: 22),
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                               tooltip: l10n.settingsTitle,
                             ),
                           ],
@@ -314,6 +330,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ),
           ),
 
+          // Live Recipe Catalog Counter Banner
+          SliverToBoxAdapter(
+            child: allRecipesAsync.maybeWhen(
+              data: (recipes) {
+                final isFiltered = _selectedCategoryKey != 'all';
+                final totalCount = recipes.length;
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryOrange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.restaurant_menu_rounded,
+                              size: 14,
+                              color: AppColors.primaryOrange,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              '$totalCount Recipes',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primaryOrange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          isFiltered
+                              ? 'Viewing ${_getChipLabel(_selectedCategoryKey, l10n)}'
+                              : 'Authentic Kitchen Collection',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ),
+
           // Main Home Sections
           allRecipesAsync.when(
             data: (recipes) {
@@ -356,11 +434,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 return SliverPadding(
                   padding: const EdgeInsets.all(16),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       mainAxisSpacing: 14,
                       crossAxisSpacing: 14,
-                      childAspectRatio: 0.78,
+                      childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.70 : 0.76,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (ctx, idx) => RecipeCard(
@@ -841,7 +919,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   Widget _buildHorizontalRecipeList(List<Recipe> recipes) {
     return SizedBox(
-      height: 216,
+      height: 232,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),

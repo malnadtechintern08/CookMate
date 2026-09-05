@@ -27,6 +27,12 @@ import '../../features/submissions/presentation/screens/submit_recipe_screen.dar
 import '../../features/notifications/data/models/notification_model.dart';
 import '../../features/notifications/presentation/screens/notification_details_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
+import '../../features/support/presentation/screens/contact_us_screen.dart';
+import '../../features/support/presentation/screens/faq_screen.dart';
+import '../../features/support/presentation/screens/help_center_screen.dart';
+import '../../features/support/presentation/screens/privacy_policy_screen.dart';
+import '../../features/rating/presentation/screens/rate_us_screen.dart';
+import '../../features/support/presentation/screens/safety_guidelines_screen.dart';
 import '../../l10n/app_localizations.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -39,10 +45,53 @@ final GlobalKey<NavigatorState> _shellNavigatorShoppingKey = GlobalKey<Navigator
 final GlobalKey<NavigatorState> _shellNavigatorMoreKey = GlobalKey<NavigatorState>(debugLabel: 'shellMore');
 
 class AppRouter {
+  static GlobalKey<NavigatorState> get rootNavigatorKey => _rootNavigatorKey;
+
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: RoutePaths.splash,
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 64, color: AppColors.primary),
+              const SizedBox(height: 16),
+              const Text(
+                'Page Not Found',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                state.error?.message ?? 'The requested page was not found.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.go(RoutePaths.home),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: const Text('Return to Home', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
     routes: [
+      // 0. Fallback / Root Redirect
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => RoutePaths.home,
+      ),
+
       // 1. Initial Splash Screen
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -276,6 +325,58 @@ class AppRouter {
               initialNotification: notif,
             ),
           );
+        },
+      ),
+
+      // 5 Support & Legal Separate Pages
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.privacyPolicy,
+        name: RouteNames.privacyPolicy,
+        builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.faq,
+        name: RouteNames.faq,
+        builder: (context, state) => const FaqScreen(),
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.contactUs,
+        name: RouteNames.contactUs,
+        builder: (context, state) => const ContactUsScreen(),
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.helpCenter,
+        name: RouteNames.helpCenter,
+        builder: (context, state) => const HelpCenterScreen(),
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.safetyGuidelines,
+        name: RouteNames.safetyGuidelines,
+        builder: (context, state) => const SafetyGuidelinesScreen(),
+      ),
+
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RoutePaths.rateUs,
+        name: RouteNames.rateUs,
+        builder: (context, state) {
+          int initialStars = 3;
+          if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            initialStars = (map['stars'] as int?) ?? 3;
+          } else if (state.extra is int) {
+            initialStars = state.extra as int;
+          }
+          return RateUsScreen(initialStars: initialStars);
         },
       ),
     ],

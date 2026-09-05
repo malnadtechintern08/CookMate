@@ -27,7 +27,31 @@ class CategoryRecipesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: categoryAsync.when(
-          data: (category) => Text(category?.name ?? 'Category Recipes'),
+          data: (category) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                category?.name ?? 'Category Recipes',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+              ),
+              recipesAsync.maybeWhen(
+                data: (recipes) => Text(
+                  '${recipes.length} Recipes',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+                orElse: () => const SizedBox.shrink(),
+              ),
+            ],
+          ),
           loading: () => const Text('Loading...'),
           error: (error, stack) => const Text('Category Recipes'),
         ),
@@ -57,11 +81,11 @@ class CategoryRecipesScreen extends ConsumerWidget {
             return GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 14,
                 mainAxisSpacing: 14,
-                childAspectRatio: 0.78,
+                childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.70 : 0.76,
               ),
               itemCount: recipes.length,
               itemBuilder: (context, index) {

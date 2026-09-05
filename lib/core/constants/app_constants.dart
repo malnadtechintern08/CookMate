@@ -2,7 +2,7 @@ class AppConstants {
   static const String appName = 'CookMate';
   static const String appTagline = 'Your Personal Kitchen Companion';
   static const String dbName = 'cookmate.db';
-  static const int dbVersion = 4;
+  static const int dbVersion = 5;
 
   // Shared Preferences Keys
   static const String keyThemeMode = 'cookmate_theme_mode';
@@ -48,4 +48,10 @@ class AppConstants {
   static const String apiNotificationsMarkAllReadEndpoint = '$apiBaseUrl/api/notifications/mark-all-read.php';
   static const String apiNotificationsMarkUnreadEndpoint = '$apiBaseUrl/api/notifications/mark-unread.php';
   static const String apiNotificationsDetailsEndpoint = '$apiBaseUrl/api/notifications/details.php';
+
+  // Support, FAQs & Policy APIs
+  static const String apiSupportPageEndpoint = '$apiBaseUrl/api/support/page.php';
+  static const String apiFaqsEndpoint = '$apiBaseUrl/api/support/faqs.php';
+  static const String apiContactSubmitEndpoint = '$apiBaseUrl/api/support/contact.php';
+  static const String apiRatingsSubmitEndpoint = '$apiBaseUrl/api/ratings/submit.php';
 }

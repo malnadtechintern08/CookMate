@@ -64,6 +64,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
             $pdo->exec(file_get_contents($subMigrationFile));
         }
 
+        // Run notifications migration
+        $notifMigrationFile = __DIR__ . '/migrations/003_create_notifications_system.sql';
+        if (file_exists($notifMigrationFile)) {
+            $pdo->exec(file_get_contents($notifMigrationFile));
+        }
+
+        // Run support & pages migration
+        $supportMigrationFile = __DIR__ . '/migrations/004_create_support_and_pages.sql';
+        if (file_exists($supportMigrationFile)) {
+            $pdo->exec(file_get_contents($supportMigrationFile));
+        }
+
         // Verify count
         $catCount = $pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
         $recCount = $pdo->query("SELECT COUNT(*) FROM recipes")->fetchColumn();
@@ -208,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
     <div class="setup-card">
         <img src="<?= BASE_URL ?>/assets/images/cookmate_logo.png" alt="CookMate" class="logo-img">
         <h1><span class="brand-cookmate" style="font-family:'Outfit',sans-serif;font-weight:800;display:inline-flex;align-items:baseline;"><span class="cook-part" style="color:#FFFFFF !important;font-weight:800;">Cook</span><span class="mate-part" style="color:#E50915 !important;font-weight:800;">Mate</span></span> Database Setup</h1>
-        <p class="subtitle">Initialize the MySQL database <code><?= htmlspecialchars(DB_NAME) ?></code> and import all 200 authentic recipes and 8 categories directly into phpMyAdmin.</p>
+        <p class="subtitle">Initialize the MySQL database <code><?= htmlspecialchars(DB_NAME) ?></code> and import 50 authentic recipes and 8 categories directly into phpMyAdmin.</p>
 
         <?php if ($message): ?>
             <div class="alert alert-<?= $status ?>">
@@ -220,7 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['auto'])) {
             </div>
         <?php else: ?>
             <form method="POST">
-                <button type="submit" class="btn-primary">⚡ Initialize & Seed 200 Recipes</button>
+                <button type="submit" class="btn-primary">⚡ Initialize & Seed 50 Recipes</button>
                 <a href="<?= BASE_URL ?>/index.php" class="btn-secondary">Cancel</a>
             </form>
         <?php endif; ?>

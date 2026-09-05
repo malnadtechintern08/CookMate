@@ -8,6 +8,8 @@ import '../../data/models/notification_model.dart';
 import '../providers/notification_providers.dart';
 import '../widgets/notification_card.dart';
 import '../../../recipes/presentation/providers/recipe_providers.dart';
+import '../../services/cookmate_notification_service.dart';
+import '../../services/notification_sync_service.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -21,6 +23,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationSyncService.instance.updateRef(ref);
       ref.read(notificationsProvider.notifier).loadNotifications();
       ref.read(unreadNotificationCountProvider.notifier).refresh();
     });
@@ -149,6 +152,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         backgroundColor: isDark ? AppColors.surface : AppColors.lightSurface,
         elevation: 0,
         actions: [
+          IconButton(
+            tooltip: 'Test Heads-Up Popup',
+            icon: const Icon(Icons.notifications_active_outlined, size: 22, color: AppColors.primary),
+            onPressed: () async {
+              HapticFeedback.lightImpact();
+              await CookMateNotificationService.instance.showTestNotification();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Heads-up notification triggered! Check the top of your screen.'),
+                    duration: Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+          ),
           if (unreadCount > 0)
             TextButton.icon(
               onPressed: _showMarkAllReadDialog,

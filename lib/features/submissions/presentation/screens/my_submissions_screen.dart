@@ -215,16 +215,27 @@ class MySubmissionsScreen extends ConsumerWidget {
           const SizedBox(height: 6),
 
           // Meta info
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(Icons.schedule, size: 14, color: isDark ? Colors.white54 : Colors.black45),
-              const SizedBox(width: 4),
-              Text('${sub.totalTime} mins', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              const SizedBox(width: 12),
-              Icon(Icons.restaurant, size: 14, color: isDark ? Colors.white54 : Colors.black45),
-              const SizedBox(width: 4),
-              Text('${sub.ingredientCount} ingredients', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              const SizedBox(width: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.schedule, size: 14, color: isDark ? Colors.white54 : Colors.black45),
+                  const SizedBox(width: 4),
+                  Text('${sub.totalTime} mins', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.restaurant, size: 14, color: isDark ? Colors.white54 : Colors.black45),
+                  const SizedBox(width: 4),
+                  Text('${sub.ingredientCount} ingredients', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                ],
+              ),
               Text(
                 sub.isVegetarian ? '🌱 Veg' : '🍗 Non-Veg',
                 style: TextStyle(

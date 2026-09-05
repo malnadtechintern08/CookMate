@@ -57,8 +57,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Center(
-        child: AnimatedBuilder(
-          animation: _controller,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: AnimatedBuilder(
+            animation: _controller,
           builder: (context, child) {
             return FadeTransition(
               opacity: _fadeAnimation,
@@ -142,6 +144,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
             );
           },
+        ),
         ),
       ),
     );

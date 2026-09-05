@@ -50,6 +50,9 @@ dependencies:
   pointycastle: ^4.0.0
   convert: ^3.1.2
   image_picker: ^1.2.3
+  in_app_review: ^2.0.12
+  flutter_local_notifications: ^22.3.0
+  workmanager: ^0.10.9
 
 dev_dependencies:
   flutter_test:

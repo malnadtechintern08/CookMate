@@ -23,4 +23,10 @@ class RouteNames {
   static const String mySubmissions = 'my_submissions';
   static const String notifications = 'notifications';
   static const String notificationDetails = 'notification_details';
+  static const String privacyPolicy = 'privacy_policy';
+  static const String faq = 'faq';
+  static const String contactUs = 'contact_us';
+  static const String helpCenter = 'help_center';
+  static const String safetyGuidelines = 'safety_guidelines';
+  static const String rateUs = 'rate_us';
 }

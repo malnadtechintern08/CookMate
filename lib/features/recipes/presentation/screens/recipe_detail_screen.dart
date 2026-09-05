@@ -14,6 +14,7 @@ import '../../../shopping/presentation/providers/shopping_provider.dart';
 import '../../domain/entities/recipe.dart';
 import '../providers/recently_viewed_provider.dart';
 import '../providers/recipe_providers.dart';
+import '../../../rating/services/rating_service.dart';
 import '../../../tags/presentation/providers/tag_providers.dart';
 import '../widgets/ingredient_list_widget.dart';
 
@@ -155,8 +156,15 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
           );
         }
 
-        return Scaffold(
-          body: CustomScrollView(
+        return PopScope(
+          canPop: true,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) {
+              RatingService.instance.triggerBackNavigationRating();
+            }
+          },
+          child: Scaffold(
+            body: CustomScrollView(
             slivers: [
               // Hero Image Sliver App Bar
               SliverAppBar(
@@ -198,6 +206,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                         ),
                         onPressed: () {
                           ref.read(recipeControllerProvider.notifier).toggleFavorite(recipe.id);
+                          RatingService.instance.recordMeaningfulAction();
                         },
                       ),
                     ),
@@ -339,14 +348,17 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.person_outline_rounded, size: 14, color: AppColors.primaryOrange),
-                              const SizedBox(width: 6),
-                              Text(
-                                recipe.chefName.toLowerCase().contains('community')
-                                    ? recipe.chefName
-                                    : 'Recipe by ${recipe.chefName}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
+                              Flexible(
+                                child: Text(
+                                  recipe.chefName.toLowerCase().contains('community')
+                                      ? recipe.chefName
+                                      : 'Recipe by ${recipe.chefName}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ],
@@ -359,12 +371,16 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                         children: [
                           const Icon(Icons.location_on_outlined, size: 15, color: AppColors.primaryOrange),
                           const SizedBox(width: 4),
-                          Text(
-                            recipe.region,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primaryOrange,
+                          Flexible(
+                            child: Text(
+                              recipe.region,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryOrange,
+                              ),
                             ),
                           ),
                           if (recipe.nutrition.isNotEmpty) ...[
@@ -666,8 +682,9 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
               },
             ),
           ),
-        );
-      },
+        ),
+      );
+    },
       loading: () => const Scaffold(
         body: Center(child: AppLoadingIndicator()),
       ),
